@@ -1,0 +1,21 @@
+// Copy this file to Config/Local.xcconfig and adjust the values below.
+// Config/Local.xcconfig is gitignored and included by Config/Signing.xcconfig.
+//
+//   cp Config/Local.xcconfig.example Config/Local.xcconfig
+//
+// Without a Development Team, the build falls back to ad-hoc signing
+// ("Sign to Run Locally"). macOS then re-asks for audio-capture permission
+// after every rebuild, because TCC grants are tied to the code signature.
+
+// Your Apple Developer Team ID (10 characters). A free Personal Team works.
+// Leave empty to ad-hoc sign.
+// DEVELOPMENT_TEAM = ABCDE12345
+
+// Override the bundle identifier prefix if com.gustavoscarpini collides with
+// something you already have registered.
+// BUNDLE_ID_PREFIX = com.yourname
+
+// Required together with DEVELOPMENT_TEAM: Signing.xcconfig defaults the
+// identity to "-" (ad-hoc), so setting only the team keeps ad-hoc signing.
+// CODE_SIGN_IDENTITY = Apple Development
+// CODE_SIGN_STYLE = Automatic

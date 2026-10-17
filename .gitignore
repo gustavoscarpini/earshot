@@ -1,0 +1,13 @@
+# Xcode / Swift
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Local, machine-specific signing configuration
+Config/Local.xcconfig
+
+# macOS
+.DS_Store

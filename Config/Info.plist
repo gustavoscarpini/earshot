@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Base Info.plist for Earshot.
+
+  The project uses GENERATE_INFOPLIST_FILE = YES, which fills in the bundle keys
+  and the INFOPLIST_KEY_* settings; this file only supplies keys that Xcode has
+  no dedicated build setting for. The two are merged at build time.
+
+  NSAudioCaptureUsageDescription is the System Audio Recording prompt shown when
+  Earshot creates its first Core Audio process tap. Xcode 26.x does not expose an
+  INFOPLIST_KEY_ for it, so it is declared here.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Earshot records the audio of individual apps so it can apply the volume level you set for each one.</string>
+</dict>
+</plist>
