@@ -5,9 +5,11 @@ import SwiftUI
 ///
 /// Placeholder layout with the three sections from the design document, top to
 /// bottom: master volume + output device, apps currently playing, and
-/// microphone. All content is static text for now — the controls are wired up in
-/// later steps.
+/// microphone. The Apps section lists the apps playing audio, with their icon
+/// and name; volume control is wired up in later steps.
 struct PanelView: View {
+    let playingApps: PlayingAppsModel
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Earshot")
@@ -18,7 +20,7 @@ struct PanelView: View {
             }
 
             PanelSection(title: "Apps") {
-                Text("Apps currently playing appear here.")
+                appsSection
             }
 
             PanelSection(title: "Microphone") {
@@ -36,6 +38,49 @@ struct PanelView: View {
         }
         .padding(16)
         .frame(width: 320)
+    }
+
+    @ViewBuilder private var appsSection: some View {
+        if playingApps.apps.isEmpty {
+            Text("No apps are playing audio.")
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(playingApps.apps) { app in
+                    PlayingAppRow(app: app)
+                }
+            }
+        }
+    }
+}
+
+/// One row in the Apps section: app icon and name.
+private struct PlayingAppRow: View {
+    let app: PlayingApp
+
+    var body: some View {
+        HStack(spacing: 8) {
+            icon
+                .frame(width: 16, height: 16)
+            Text(app.name)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .opacity(app.isPlaying ? 1 : 0.4)
+        .help(app.name)
+    }
+
+    @ViewBuilder private var icon: some View {
+        if app.id.hasSuffix(".app") {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: app.id))
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+        } else {
+            Image(systemName: "app.dashed")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
