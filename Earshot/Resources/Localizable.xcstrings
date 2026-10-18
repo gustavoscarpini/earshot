@@ -55,24 +55,6 @@
         }
       }
     },
-    "Master volume and output device controls go here.": {
-      "comment": "Placeholder text in the Output panel section.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Master volume and output device controls go here."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O volume geral e o seletor de dispositivo de saída ficam aqui."
-          }
-        }
-      }
-    },
     "Microphone": {
       "comment": "Panel section heading: microphone controls.",
       "extractionState": "manual",
@@ -157,6 +139,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sair"
+          }
+        }
+      }
+    },
+    "Software volume": {
+      "comment": "Caption under the master slider when the output device has no hardware volume.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Software volume"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volume por software"
           }
         }
       }

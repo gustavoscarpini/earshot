@@ -34,4 +34,43 @@ struct TapReconcilerTests {
         let changes = TapReconciler.changes(current: ["z": spec], desired: ["a": spec])
         #expect(changes == [.destroy(id: "z"), .create(id: "a", spec: spec)])
     }
+
+    // MARK: Global tap
+
+    private let global = GlobalTapSpec(excludedProcessObjectIDs: [5, 3], gain: 0.5)
+
+    @Test func globalSpecSortsExclusions() {
+        #expect(global.excludedProcessObjectIDs == [3, 5])
+    }
+
+    @Test func noGlobalTapToNoGlobalTapIsNoChange() {
+        #expect(TapReconciler.globalChange(current: nil, desired: nil) == nil)
+    }
+
+    @Test func newGlobalTapIsCreated() {
+        #expect(TapReconciler.globalChange(current: nil, desired: global) == .create(global))
+    }
+
+    @Test func goneGlobalTapIsDestroyed() {
+        #expect(TapReconciler.globalChange(current: global, desired: nil) == .destroy)
+    }
+
+    @Test func exclusionChangeRecreatesGlobalTap() {
+        let more = GlobalTapSpec(excludedProcessObjectIDs: [3, 5, 9], gain: 0.5)
+        #expect(TapReconciler.globalChange(current: global, desired: more) == .recreate(more))
+    }
+
+    @Test func exclusionAndGainChangeRecreatesGlobalTap() {
+        let both = GlobalTapSpec(excludedProcessObjectIDs: [3], gain: 0.9)
+        #expect(TapReconciler.globalChange(current: global, desired: both) == .recreate(both))
+    }
+
+    @Test func globalGainOnlyChangeUpdatesInPlace() {
+        let louder = GlobalTapSpec(excludedProcessObjectIDs: [3, 5], gain: 0.8)
+        #expect(TapReconciler.globalChange(current: global, desired: louder) == .updateGain(0.8))
+    }
+
+    @Test func identicalGlobalSpecIsNoChange() {
+        #expect(TapReconciler.globalChange(current: global, desired: global) == nil)
+    }
 }

@@ -3,12 +3,13 @@ import SwiftUI
 
 /// The menu bar panel.
 ///
-/// Placeholder layout with the three sections from the design document, top to
-/// bottom: master volume + output device, apps currently playing, and
-/// microphone. The Apps section lists the apps playing audio, with their icon
-/// and name; volume control is wired up in later steps.
+/// Layout with the three sections from the design document, top to bottom:
+/// master volume + output device, apps currently playing, and microphone (still
+/// a placeholder). The Apps section lists the apps playing audio, with their
+/// icon, name, volume slider and mute button.
 struct PanelView: View {
     let playingApps: PlayingAppsModel
+    let output: OutputModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -16,7 +17,7 @@ struct PanelView: View {
                 .font(.headline)
 
             PanelSection(title: "Output") {
-                Text("Master volume and output device controls go here.")
+                OutputSection(model: output)
             }
 
             PanelSection(title: "Apps") {
@@ -106,6 +107,62 @@ private struct PlayingAppRow: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// The Output section: device picker, mute button, master slider and percent.
+private struct OutputSection: View {
+    let model: OutputModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker(
+                "Output",
+                selection: Binding(
+                    get: { model.selectedUID },
+                    set: { uid in
+                        if let uid { model.select(uid: uid) }
+                    }
+                )
+            ) {
+                ForEach(model.devices) { device in
+                    Text(device.name).tag(Optional(device.uid))
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+
+            HStack(spacing: 8) {
+                Button {
+                    model.toggleMute()
+                } label: {
+                    Image(systemName: model.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .frame(width: 18)
+                }
+                .buttonStyle(.borderless)
+                .help(model.isMuted ? "Unmute" : "Mute")
+
+                Slider(
+                    value: Binding(
+                        get: { Double(model.volume) },
+                        set: { model.setVolume(Float($0)) }
+                    ),
+                    in: 0...1
+                )
+                .controlSize(.small)
+                .disabled(model.isMuted)
+
+                Text(model.volume, format: .percent.precision(.fractionLength(0)))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+
+            if model.usesSoftwareMaster {
+                Text("Software volume")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

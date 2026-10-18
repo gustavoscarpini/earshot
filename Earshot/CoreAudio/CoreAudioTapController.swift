@@ -1,4 +1,5 @@
 import CoreAudio
+import Darwin
 import Foundation
 import os
 
@@ -10,6 +11,11 @@ import os
 /// (`muteBehavior = .mutedWhenTapped`, DESIGN §1). When the default output
 /// changes, every tap is torn down and rebuilt against the new device
 /// (DESIGN §3).
+///
+/// A software master below 100% adds one more `ProcessTap`, the global tap: it
+/// captures every process except the individually tapped apps and Earshot
+/// itself, whose playback would otherwise be captured again in a feedback loop
+/// (DESIGN §9).
 @MainActor
 final class CoreAudioTapController: TapController {
     private static let logger = Logger(subsystem: "com.gustavoscarpini.Earshot", category: "taps")
@@ -18,8 +24,11 @@ final class CoreAudioTapController: TapController {
     /// The taps that exist right now, with the spec each was built from.
     private var active: [String: (spec: TapSpec, tap: ProcessTap)] = [:]
 
+    /// The global tap, if one exists, with the spec it was built from.
+    private var activeGlobal: (spec: GlobalTapSpec, tap: ProcessTap)?
+
     /// The last desired state, replayed when the output device changes.
-    private var desired: [String: TapSpec] = [:]
+    private var desired = TapPlan(perApp: [:], global: nil)
 
     /// The UID of the output device the taps play to.
     private var outputUID: String?
@@ -44,11 +53,12 @@ final class CoreAudioTapController: TapController {
 
     // MARK: TapController
 
-    func apply(_ desired: [String: TapSpec]) {
-        self.desired = desired
-        let current = active.mapValues(\.spec)
+    func apply(_ plan: TapPlan) {
+        desired = plan
 
-        for change in TapReconciler.changes(current: current, desired: desired) {
+        // Per-app changes first, then the global one.
+        let current = active.mapValues(\.spec)
+        for change in TapReconciler.changes(current: current, desired: plan.perApp) {
             switch change {
             case .destroy(let id):
                 active.removeValue(forKey: id)?.tap.destroy()
@@ -63,6 +73,8 @@ final class CoreAudioTapController: TapController {
                 build(id: id, spec: spec)
             }
         }
+
+        applyGlobal(plan.global)
     }
 
     // MARK: Private
@@ -73,14 +85,64 @@ final class CoreAudioTapController: TapController {
             return
         }
         do {
-            let tap = try ProcessTap(
-                processObjectIDs: spec.processObjectIDs,
-                outputDeviceUID: outputUID,
-                gain: spec.gain
-            )
+            let description = CATapDescription(stereoMixdownOfProcesses: spec.processObjectIDs.map { AudioObjectID($0) })
+            let tap = try ProcessTap(description: description, outputDeviceUID: outputUID, gain: spec.gain)
             active[id] = (spec, tap)
         } catch {
             Self.logger.error("Could not tap \(id, privacy: .public): \(error, privacy: .public)")
+        }
+    }
+
+    /// Reconciles the global tap with `desired`.
+    ///
+    /// Earshot's own process object is appended to the exclusion list, so the
+    /// global tap never captures Earshot's own playback (including its own) —
+    /// that would be a feedback loop. Earshot gets a process object as soon as
+    /// it talks to the HAL, but if it cannot be resolved the global tap is not
+    /// built at all and is retried on the next call.
+    private func applyGlobal(_ desired: GlobalTapSpec?) {
+        var desired = desired
+        if let spec = desired {
+            if let own = Self.ownProcessObjectID() {
+                desired = GlobalTapSpec(excludedProcessObjectIDs: spec.excludedProcessObjectIDs + [own], gain: spec.gain)
+            } else {
+                Self.logger.error("Earshot's own process object is unknown; skipping the global tap")
+                desired = nil
+            }
+        }
+
+        switch TapReconciler.globalChange(current: activeGlobal?.spec, desired: desired) {
+        case nil:
+            break
+        case .destroy:
+            activeGlobal?.tap.destroy()
+            activeGlobal = nil
+        case .updateGain(let gain):
+            guard let entry = activeGlobal else { return }
+            entry.tap.setGain(gain)
+            activeGlobal = (GlobalTapSpec(excludedProcessObjectIDs: entry.spec.excludedProcessObjectIDs, gain: gain), entry.tap)
+        case .create(let spec):
+            buildGlobal(spec)
+        case .recreate(let spec):
+            activeGlobal?.tap.destroy()
+            activeGlobal = nil
+            buildGlobal(spec)
+        }
+    }
+
+    private func buildGlobal(_ spec: GlobalTapSpec) {
+        guard let outputUID else {
+            Self.logger.error("No default output device; cannot build the global tap")
+            return
+        }
+        do {
+            let description = CATapDescription(
+                stereoGlobalTapButExcludeProcesses: spec.excludedProcessObjectIDs.map { AudioObjectID($0) }
+            )
+            let tap = try ProcessTap(description: description, outputDeviceUID: outputUID, gain: spec.gain)
+            activeGlobal = (spec, tap)
+        } catch {
+            Self.logger.error("Could not build the global tap: \(error, privacy: .public)")
         }
     }
 
@@ -93,6 +155,8 @@ final class CoreAudioTapController: TapController {
             entry.tap.destroy()
         }
         active.removeAll()
+        activeGlobal?.tap.destroy()
+        activeGlobal = nil
         apply(desired)
     }
 
@@ -102,6 +166,25 @@ final class CoreAudioTapController: TapController {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
+    }
+
+    /// Earshot's own Core Audio process object, or `nil` while the HAL has none
+    /// for this process yet (it appears once Earshot starts playing audio).
+    private static func ownProcessObjectID() -> AudioObjectID? {
+        var address = address(kAudioHardwarePropertyTranslatePIDToProcessObject)
+        var pid = getpid()
+        var object = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        let status = AudioObjectGetPropertyData(
+            systemObject,
+            &address,
+            UInt32(MemoryLayout<pid_t>.size),
+            &pid,
+            &size,
+            &object
+        )
+        guard status == noErr, object != kAudioObjectUnknown else { return nil }
+        return object
     }
 
     /// The UID of the system default output device, if any.
@@ -133,22 +216,27 @@ struct CoreAudioError: Error, CustomStringConvertible {
     var description: String { "\(operation) failed (OSStatus \(status))" }
 }
 
-/// One app's tap: process tap → private aggregate device → IOProc with gain.
+/// One tap: process tap → private aggregate device → IOProc with gain.
 ///
-/// The process tap mixes the app's processes to stereo and mutes their own
-/// output while it is being read. The aggregate device uses the output device
-/// as its clock and output, with the tap as its input (drift-compensated). The
-/// IOProc copies tap input to the output, applying the gain.
+/// The process tap (per-app, or global with exclusions) delivers stereo and
+/// mutes the captured processes' own output while it is being read. The
+/// aggregate device uses the output device as its clock and output, with the
+/// tap as its input (drift-compensated). The IOProc copies tap input to the
+/// output, applying the gain.
 private final class ProcessTap {
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
     private let renderer: TapRenderer
 
-    init(processObjectIDs: [UInt32], outputDeviceUID: String, gain: Float) throws {
+    /// - Parameters:
+    ///   - description: A ready tap description; name, privacy and mute
+    ///     behavior are set here.
+    ///   - outputDeviceUID: The output device the aggregate plays to.
+    ///   - gain: The initial linear gain.
+    init(description: CATapDescription, outputDeviceUID: String, gain: Float) throws {
         renderer = TapRenderer(gain: gain)
 
-        let description = CATapDescription(stereoMixdownOfProcesses: processObjectIDs.map { AudioObjectID($0) })
         description.name = "Earshot"
         description.isPrivate = true
         description.muteBehavior = .mutedWhenTapped

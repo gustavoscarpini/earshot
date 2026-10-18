@@ -9,7 +9,8 @@ import Observation
 /// processes from an `AudioProcessMonitor`. The monitor reports changes, and a
 /// one-second timer re-runs `refresh()` so lingering apps disappear on time
 /// (DESIGN §4, §5). After every change it tells the `TapController` which apps
-/// need a tap: only those below 100% or muted (DESIGN §9).
+/// need a tap: only those below 100% or muted, plus the global tap while the
+/// software master is below 100% (DESIGN §9).
 @MainActor
 @Observable
 final class PlayingAppsModel {
@@ -21,6 +22,10 @@ final class PlayingAppsModel {
 
     /// Muted app ids. Session-only, and cleared once an app leaves the list.
     private(set) var mutedIDs: Set<String> = []
+
+    /// The software master gain from the output device, `0...1`; `1` when the
+    /// output has hardware volume.
+    @ObservationIgnored private var softwareMaster: Float = 1
 
     private let monitor: any AudioProcessMonitor
     private let tapController: any TapController
@@ -104,7 +109,7 @@ final class PlayingAppsModel {
         }
         terminationObserver = nil
         monitor.stop()
-        tapController.apply([:])
+        tapController.apply(TapPlan(perApp: [:], global: nil))
     }
 
     /// Reads the monitor, reconciles the shown apps and updates the taps.
@@ -153,6 +158,13 @@ final class PlayingAppsModel {
         if mutedIDs.remove(id) == nil {
             mutedIDs.insert(id)
         }
+        applyTaps()
+    }
+
+    /// Sets the software master gain (`0` while a software master is muted) and
+    /// re-applies the taps. Pass `1` when the output has hardware volume.
+    func setSoftwareMaster(_ gain: Float) {
+        softwareMaster = min(max(gain, 0), 1)
         applyTaps()
     }
 
@@ -231,22 +243,19 @@ final class PlayingAppsModel {
         }
     }
 
-    /// Tells the tap controller which shown apps need a tap, and with which gain.
+    /// Tells the tap controller which taps are needed: per-app taps for shown
+    /// apps below 100% or muted, plus the global tap when the software master
+    /// is below 100% (`TapPlanner`).
     private func applyTaps() {
-        var desired: [String: TapSpec] = [:]
-        for app in apps {
-            let volume = volume(for: app.id)
-            let muted = isMuted(app.id)
-            guard TapPolicy.needsTap(volume: volume, muted: muted),
-                  let objects = processObjectIDs[app.id], !objects.isEmpty else {
-                continue
-            }
-            desired[app.id] = TapSpec(
-                processObjectIDs: objects,
-                gain: GainCalculator.effectiveGain(app: volume, master: 1, muted: muted)
+        let inputs = apps.map { app in
+            TapPlanInput(
+                id: app.id,
+                volume: volume(for: app.id),
+                muted: isMuted(app.id),
+                processObjectIDs: processObjectIDs[app.id] ?? []
             )
         }
-        tapController.apply(desired)
+        tapController.apply(TapPlanner.plan(apps: inputs, softwareMaster: softwareMaster))
     }
 
     /// The user-visible name of an app bundle, without the `.app` extension.

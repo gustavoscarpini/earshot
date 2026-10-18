@@ -73,6 +73,20 @@ struct PlayingAppsModelTests {
         ])
     }
 
+    @Test func softwareMasterAddsGlobalTapAndScalesAppGain() {
+        let monitor = FakeAudioProcessMonitor()
+        monitor.processesToReturn = [process(pid: 1, bundleID: "com.example.a")]
+        let taps = FakeTapController()
+        let model = makeModel(monitor, clock: Clock(t0), taps: taps)
+        model.refresh()
+        model.setVolume(0.6, for: "com.example.a")
+
+        model.setSoftwareMaster(0.5)
+
+        #expect(taps.lastPlan.global == GlobalTapSpec(excludedProcessObjectIDs: [1_001], gain: 0.5))
+        #expect(taps.lastPlan.perApp["com.example.a"]?.gain == 0.3)
+    }
+
     @Test func backToFullVolumeRemovesTheTap() {
         let monitor = FakeAudioProcessMonitor()
         monitor.processesToReturn = [process(pid: 1, bundleID: "com.example.a")]

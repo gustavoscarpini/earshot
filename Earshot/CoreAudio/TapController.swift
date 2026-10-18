@@ -6,19 +6,20 @@ import Foundation
 /// output is muted and Earshot plays the captured audio to the output device
 /// with the user's gain applied (DESIGN §1).
 ///
-/// Callers describe the taps they want, keyed by app id, and the controller
-/// works out what to create, rebuild, update or destroy (`TapReconciler`). It
-/// also follows the system default output device, rebuilding every tap against
-/// the new device when it changes (DESIGN §3).
+/// Callers describe the taps they want as a `TapPlan` (per-app taps keyed by
+/// app id, plus the optional single global tap for the software master,
+/// DESIGN §9), and the controller works out what to create, rebuild, update or
+/// destroy (`TapReconciler`). It also follows the system default output device,
+/// rebuilding every tap against the new device when it changes (DESIGN §3).
 ///
-/// The single global tap for the software master (DESIGN §9) arrives in a later
-/// step. Tests use a fake conforming to this protocol.
+/// Tests use a fake conforming to this protocol.
 @MainActor
 protocol TapController: AnyObject {
-    /// Makes the active taps match `desired`. Apps missing from `desired` lose
-    /// their tap and play directly to the hardware again.
+    /// Makes the active taps match `plan`. Apps missing from the plan lose
+    /// their tap and play directly to the hardware again; an empty plan
+    /// destroys everything.
     ///
-    /// Failures are per app: an app whose tap cannot be created is left
-    /// untapped and retried on the next call.
-    func apply(_ desired: [String: TapSpec])
+    /// Failures are per tap: a tap that cannot be created is left out and
+    /// retried on the next call.
+    func apply(_ plan: TapPlan)
 }

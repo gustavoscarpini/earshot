@@ -1,50 +1,14 @@
-import Darwin
 import Foundation
 
-/// Controls output and input devices.
+/// Controls input devices.
 ///
-/// Covers the output side from DESIGN §3 (follow the system default output,
-/// device picker, hybrid hardware/software master volume) and the microphone
-/// side from DESIGN §2 (input gain, mute, input picker, level meter).
+/// Covers the microphone side from DESIGN §2 (input gain, mute, input picker,
+/// level meter). The output side lives in `OutputDeviceController`.
 ///
 /// This is a declaration-only protocol for now; the Core Audio implementation
 /// arrives in a later step. Tests use a fake conforming to this protocol.
-protocol DeviceController: AnyObject {
-    // MARK: Output
-
-    /// The available output devices, as `(uid, name)` pairs.
-    func outputDevices() -> [(uid: String, name: String)]
-
-    /// The UID of the current system default output device, if any.
-    func defaultOutputDeviceUID() -> String?
-
-    /// Changes the system default output device.
-    func setDefaultOutputDevice(uid: String) throws
-
-    /// Whether the output device exposes a hardware volume control.
-    ///
-    /// When this is `false` (e.g. many HDMI displays) Earshot falls back to a
-    /// software master implemented with the global tap.
-    func outputHasHardwareVolume(uid: String) -> Bool
-
-    /// The hardware volume (`0...1`) of the output device, or `nil` when the
-    /// device has no hardware volume.
-    func outputVolume(uid: String) -> Float?
-
-    /// Sets the hardware volume (`0...1`) of the output device.
-    func setOutputVolume(_ volume: Float, uid: String) throws
-
-    /// Starts observing changes to the system default output device.
-    ///
-    /// - Parameter onChange: Called with the new device UID whenever the default
-    ///   output changes, so taps can be rebuilt against it.
-    func startObservingDefaultOutputChanges(_ onChange: @escaping (String) -> Void)
-
-    /// Stops observing default-output changes.
-    func stopObservingDefaultOutputChanges()
-
-    // MARK: Input
-
+@MainActor
+protocol InputDeviceController: AnyObject {
     /// The available input devices, as `(uid, name)` pairs.
     func inputDevices() -> [(uid: String, name: String)]
 
