@@ -1,4 +1,3 @@
-import Darwin
 import Foundation
 
 /// Creates, updates and destroys Core Audio process taps.
@@ -7,48 +6,19 @@ import Foundation
 /// output is muted and Earshot plays the captured audio to the output device
 /// with the user's gain applied (DESIGN §1).
 ///
-/// Two kinds of tap exist (DESIGN §9):
-/// - per-app taps, created only when an app's volume is not 100% or it is muted;
-/// - a single global tap, used for the software master on outputs without
-///   hardware volume. It captures every process except Earshot itself and the
-///   individually tapped apps, so gain is never applied twice.
+/// Callers describe the taps they want, keyed by app id, and the controller
+/// works out what to create, rebuild, update or destroy (`TapReconciler`). It
+/// also follows the system default output device, rebuilding every tap against
+/// the new device when it changes (DESIGN §3).
 ///
-/// This is a declaration-only protocol for now; the Core Audio implementation
-/// arrives in a later step. Tests use a fake conforming to this protocol.
+/// The single global tap for the software master (DESIGN §9) arrives in a later
+/// step. Tests use a fake conforming to this protocol.
+@MainActor
 protocol TapController: AnyObject {
-    /// Creates a tap for the process with `pid` and applies `gain`.
+    /// Makes the active taps match `desired`. Apps missing from `desired` lose
+    /// their tap and play directly to the hardware again.
     ///
-    /// While the tap is active, the tapped process's own output is muted
-    /// (`muteBehavior = .mutedWhenTapped`).
-    ///
-    /// - Throws: If the tap cannot be created for this process.
-    func createTap(forPID pid: pid_t, gain: Float) throws
-
-    /// Updates the gain applied by the tap for `pid`.
-    func setGain(_ gain: Float, forPID pid: pid_t)
-
-    /// Destroys the tap for `pid`, restoring the app's direct output to hardware.
-    func destroyTap(forPID pid: pid_t)
-
-    /// Creates the single global tap that applies `gain` to every process except
-    /// Earshot itself and the processes in `excludingPIDs`.
-    ///
-    /// - Throws: If the tap cannot be created.
-    func createGlobalTap(gain: Float, excludingPIDs: [pid_t]) throws
-
-    /// Updates the gain applied by the global tap.
-    func setGlobalGain(_ gain: Float)
-
-    /// Destroys the global tap, if any.
-    func destroyGlobalTap()
-
-    /// Destroys every tap, per-app and global.
-    ///
-    /// Called when the output device changes (taps are rebuilt against the new
-    /// device) and on shutdown.
-    func destroyAllTaps()
-
-    /// The current peak level (`0...1`) for a tapped process, for the per-app
-    /// level meter. Returns `0` for processes without a tap.
-    func peakLevel(forPID pid: pid_t) -> Float
+    /// Failures are per app: an app whose tap cannot be created is left
+    /// untapped and retried on the next call.
+    func apply(_ desired: [String: TapSpec])
 }

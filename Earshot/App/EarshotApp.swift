@@ -13,7 +13,11 @@ struct EarshotApp: App {
     @State private var playingApps: PlayingAppsModel
 
     init() {
-        let model = PlayingAppsModel(monitor: CoreAudioProcessMonitor())
+        let model = PlayingAppsModel(
+            monitor: CoreAudioProcessMonitor(),
+            tapController: CoreAudioTapController(),
+            volumeStore: UserDefaultsVolumeStore()
+        )
         _playingApps = State(initialValue: model)
         model.start()
     }

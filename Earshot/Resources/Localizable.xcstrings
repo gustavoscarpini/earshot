@@ -1,150 +1,182 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "Apps" : {
-      "comment" : "Panel section heading: the apps currently playing audio.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apps"
+  "sourceLanguage": "en",
+  "strings": {
+    "Apps": {
+      "comment": "Panel section heading: the apps currently playing audio.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apps"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apps"
           }
         }
       }
     },
-    "Earshot" : {
-      "comment" : "Menu bar title and panel heading.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Earshot"
+    "Earshot": {
+      "comment": "Menu bar title and panel heading.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earshot"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Earshot"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earshot"
           }
         }
       }
     },
-    "Input device, volume and level meter go here." : {
-      "comment" : "Placeholder text in the Microphone panel section.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Input device, volume and level meter go here."
+    "Input device, volume and level meter go here.": {
+      "comment": "Placeholder text in the Microphone panel section.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Input device, volume and level meter go here."
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O dispositivo de entrada, o volume e o medidor de nível ficam aqui."
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O dispositivo de entrada, o volume e o medidor de nível ficam aqui."
           }
         }
       }
     },
-    "Master volume and output device controls go here." : {
-      "comment" : "Placeholder text in the Output panel section.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Master volume and output device controls go here."
+    "Master volume and output device controls go here.": {
+      "comment": "Placeholder text in the Output panel section.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Master volume and output device controls go here."
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O volume geral e o seletor de dispositivo de saída ficam aqui."
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O volume geral e o seletor de dispositivo de saída ficam aqui."
           }
         }
       }
     },
-    "Microphone" : {
-      "comment" : "Panel section heading: microphone controls.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Microphone"
+    "Microphone": {
+      "comment": "Panel section heading: microphone controls.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Microfone"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microfone"
           }
         }
       }
     },
-    "No apps are playing audio." : {
-      "comment" : "Empty state in the Apps panel section when nothing is playing.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No apps are playing audio."
+    "Mute": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mute"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nenhum app está tocando áudio no momento."
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenciar"
           }
         }
       }
     },
-    "Output" : {
-      "comment" : "Panel section heading: master volume and output device.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Output"
+    "No apps are playing audio.": {
+      "comment": "Empty state in the Apps panel section when nothing is playing.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No apps are playing audio."
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Saída"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum app está tocando áudio no momento."
           }
         }
       }
     },
-    "Quit" : {
-      "comment" : "Button that quits Earshot.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quit"
+    "Output": {
+      "comment": "Panel section heading: master volume and output device.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output"
           }
         },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sair"
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saída"
+          }
+        }
+      }
+    },
+    "Quit": {
+      "comment": "Button that quits Earshot.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sair"
+          }
+        }
+      }
+    },
+    "Unmute": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unmute"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reativar som"
           }
         }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

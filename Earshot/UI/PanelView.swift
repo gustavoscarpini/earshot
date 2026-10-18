@@ -47,24 +47,50 @@ struct PanelView: View {
         } else {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(playingApps.apps) { app in
-                    PlayingAppRow(app: app)
+                    PlayingAppRow(app: app, model: playingApps)
                 }
             }
         }
     }
 }
 
-/// One row in the Apps section: app icon and name.
+/// One row in the Apps section: icon, name, volume slider and mute button.
 private struct PlayingAppRow: View {
     let app: PlayingApp
+    let model: PlayingAppsModel
 
     var body: some View {
-        HStack(spacing: 8) {
-            icon
-                .frame(width: 16, height: 16)
-            Text(app.name)
-                .lineLimit(1)
-            Spacer(minLength: 0)
+        let muted = model.isMuted(app.id)
+        let volume = model.volume(for: app.id)
+
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                icon
+                    .frame(width: 16, height: 16)
+                Text(app.name)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Text(volume, format: .percent.precision(.fractionLength(0)))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                Button {
+                    model.toggleMute(app.id)
+                } label: {
+                    Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .frame(width: 18)
+                }
+                .buttonStyle(.borderless)
+                .help(muted ? "Unmute" : "Mute")
+            }
+            Slider(
+                value: Binding(
+                    get: { Double(model.volume(for: app.id)) },
+                    set: { model.setVolume(Float($0), for: app.id) }
+                ),
+                in: 0...1
+            )
+            .controlSize(.small)
+            .disabled(muted)
         }
         .opacity(app.isPlaying ? 1 : 0.4)
         .help(app.name)

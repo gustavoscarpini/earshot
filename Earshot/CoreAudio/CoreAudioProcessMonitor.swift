@@ -71,6 +71,7 @@ final class CoreAudioProcessMonitor: AudioProcessMonitor {
         return processObjectIDs().compactMap { object in
             guard let pid = pid(of: object), pid != ownPID else { return nil }
             return AudioProcess(
+                objectID: object,
                 pid: pid,
                 bundleID: bundleID(of: object),
                 executablePath: executablePath(of: pid),

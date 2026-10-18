@@ -19,4 +19,15 @@ struct TapPolicyTests {
     @Test func volumeAboveFullNeedsTap() {
         #expect(TapPolicy.needsTap(volume: 1.001, muted: false))
     }
+
+    @Test func normalizedVolumeSnapsNearFullToFull() {
+        #expect(TapPolicy.normalizedVolume(0.99) == 1)
+        #expect(TapPolicy.normalizedVolume(0.998) == 1)
+        #expect(TapPolicy.normalizedVolume(0.98) == 0.98)
+    }
+
+    @Test func normalizedVolumeClamps() {
+        #expect(TapPolicy.normalizedVolume(-0.2) == 0)
+        #expect(TapPolicy.normalizedVolume(1.5) == 1)
+    }
 }

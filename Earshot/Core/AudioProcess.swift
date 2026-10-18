@@ -7,6 +7,9 @@ import Foundation
 /// about, decoupled from `AudioObjectID` so the pure core can group and track
 /// apps without importing Core Audio (DESIGN §1, §11).
 struct AudioProcess: Equatable, Sendable {
+    /// The Core Audio process object (`AudioObjectID`), used to build taps.
+    let objectID: UInt32
+
     /// The process identifier.
     let pid: pid_t
 
