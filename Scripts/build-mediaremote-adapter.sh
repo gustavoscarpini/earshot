@@ -98,5 +98,9 @@ fi
 
 cp -f "$V/bin/mediaremote-adapter.pl" "$RESOURCES_DIR/mediaremote-adapter.pl"
 
-# Ad-hoc when signing is off (CODE_SIGNING_ALLOWED=NO in tests and CI).
-codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" "$FW"
+# Ad-hoc when signing is off (CODE_SIGNING_ALLOWED=NO in tests and CI). The
+# hardened runtime and Xcode's extra flags (the secure timestamp in release
+# builds) are required for notarization.
+# shellcheck disable=SC2086 # OTHER_CODE_SIGN_FLAGS is a list of flags.
+codesign --force --options runtime ${OTHER_CODE_SIGN_FLAGS:-} \
+    --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" "$FW"

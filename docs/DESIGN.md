@@ -49,8 +49,10 @@ Earshot is an open-source macOS menu bar app for per-app volume control, output 
 - Configurable global shortcut to toggle mic mute (no Accessibility needed — registered hotkey). The menu bar icon reflects mic-muted state.
 
 ### 7. Distribution
-- Open source on GitHub; users build from source.
-- No Developer ID, no notarization, no auto-update.
+- Open source on GitHub; anyone can build from source with their own team.
+- Pushing a `v*` tag runs `.github/workflows/release.yml`: tests, a universal build (`Scripts/package-release.sh`), and a GitHub release with the zipped app and its SHA-256.
+- For now releases are ad-hoc signed and **not notarized** (no Developer ID certificate yet): users approve the first launch in System Settings › Privacy & Security, and macOS re-asks for audio permissions after each update. Adding the Developer ID secrets switches the same workflow to signed, notarized builds with no code change.
+- No auto-update; new versions are downloaded from GitHub Releases.
 - No App Sandbox.
 - Launch at login via `SMAppService`.
 

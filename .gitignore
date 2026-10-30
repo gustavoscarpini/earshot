@@ -11,3 +11,10 @@ Config/Local.xcconfig
 
 # macOS
 .DS_Store
+
+# Signing material: never commit certificates or API keys
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+*.provisionprofile
