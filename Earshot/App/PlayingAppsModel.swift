@@ -20,6 +20,10 @@ final class PlayingAppsModel {
     /// Per-app volume by app id, `0...1`. Missing means 100%.
     private(set) var volumes: [String: Float] = [:]
 
+    /// Display names of the other apps currently capturing the microphone, in
+    /// first-seen order. Earshot's own capture is excluded.
+    private(set) var micUsers: [String] = []
+
     /// Muted app ids. Session-only, and cleared once an app leaves the list.
     private(set) var mutedIDs: Set<String> = []
 
@@ -32,6 +36,8 @@ final class PlayingAppsModel {
     private let volumeStore: any VolumeStore
     private let now: () -> Date
     private let appBundleIdentifier: (String) -> String?
+    private let ownPID: pid_t
+    private let ownBundleID: String?
     private var tracker = PlayingAppsTracker()
     private var timer: Timer?
     private var terminationObserver: (any NSObjectProtocol)?
@@ -53,18 +59,25 @@ final class PlayingAppsModel {
     ///   - now: The current-time source, injectable for tests.
     ///   - appBundleIdentifier: Resolves the bundle identifier of an app bundle
     ///     path, injectable for tests.
+    ///   - ownPID: Earshot's process identifier, whose input never counts as
+    ///     another app using the microphone.
+    ///   - ownBundleID: Earshot's bundle identifier, likewise.
     init(
         monitor: any AudioProcessMonitor,
         tapController: any TapController,
         volumeStore: any VolumeStore,
         now: @escaping () -> Date = Date.init,
-        appBundleIdentifier: @escaping (String) -> String? = { Bundle(path: $0)?.bundleIdentifier }
+        appBundleIdentifier: @escaping (String) -> String? = { Bundle(path: $0)?.bundleIdentifier },
+        ownPID: pid_t = getpid(),
+        ownBundleID: String? = Bundle.main.bundleIdentifier
     ) {
         self.monitor = monitor
         self.tapController = tapController
         self.volumeStore = volumeStore
         self.now = now
         self.appBundleIdentifier = appBundleIdentifier
+        self.ownPID = ownPID
+        self.ownBundleID = ownBundleID
     }
 
     /// Starts observing the monitor and the one-second linger timer.
@@ -122,6 +135,16 @@ final class PlayingAppsModel {
         }
         for entry in playing where persistenceKeys[entry.id] == nil {
             loadStoredVolume(forAppID: entry.id)
+        }
+
+        let users = Self.micUserNames(
+            processes,
+            ownPID: ownPID,
+            ownBundleID: ownBundleID,
+            displayName: { Self.displayName(forAppBundlePath: $0) }
+        )
+        if users != micUsers {
+            micUsers = users
         }
 
         tracker.update(playing: playing, now: now())
@@ -196,6 +219,31 @@ final class PlayingAppsModel {
         }
 
         return result
+    }
+
+    /// The display names of the apps capturing audio input, grouped like the
+    /// playing apps and in first-seen order.
+    ///
+    /// Only processes inside an `.app` bundle count: system daemons such as
+    /// CoreSpeech ("Hey Siri") capture the microphone all the time and are not
+    /// apps the user started. A process is also skipped when it is Earshot
+    /// itself (`ownPID`) or belongs to Earshot's bundle (`ownBundleID`, including
+    /// its helpers), so the level meter's own capture never counts as another
+    /// app.
+    static func micUserNames(
+        _ processes: [AudioProcess],
+        ownPID: pid_t,
+        ownBundleID: String?,
+        displayName: (String) -> String
+    ) -> [String] {
+        let others = processes.filter { process in
+            guard process.isRunningInput, process.pid != ownPID else { return false }
+            guard let path = process.executablePath,
+                  AppGrouping.outermostAppBundlePath(forExecutablePath: path) != nil else { return false }
+            guard let ownBundleID, let bundleID = process.bundleID else { return true }
+            return bundleID != ownBundleID && !bundleID.hasPrefix(ownBundleID + ".")
+        }
+        return group(others, displayName: displayName).map(\.name)
     }
 
     /// Every process object of each app, keyed by the same id as `group`, so a

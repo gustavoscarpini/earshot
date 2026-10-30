@@ -6,7 +6,7 @@ by hand before a release. Based on DESIGN §11.
 ## Per-app volume
 
 - [ ] Set an app (e.g. Spotify) to 30% and confirm it gets quieter.
-- [ ] Confirm the level meter appears only for tapped apps.
+- [ ] Confirm the level meter appears only for tapped apps (not wired up yet).
 - [ ] Return the app to 100% and confirm the tap is destroyed (the app plays
       directly to hardware again).
 - [ ] Mute an app, then unmute it, and confirm audio returns.
@@ -33,11 +33,27 @@ by hand before a release. Based on DESIGN §11.
 - [ ] Adjust mic input gain on a device that has hardware input volume.
 - [ ] Mute and unmute the microphone globally.
 - [ ] Confirm the menu bar icon reflects the mic-muted state.
-- [ ] Switch the input device via the picker and confirm it becomes the system
+- [ ] Switch the input device by tapping its card and confirm it becomes the system
       default input.
 - [ ] Connect a USB mic without hardware volume (e.g. HyperX SoloCast) and
       confirm the slider is disabled with a "not supported by this device" hint
       while mute still works.
+
+- [ ] Open the panel while no other app records: no meter, and the waveform
+      button starts and stops it by hand. Closing the panel stops it.
+- [ ] Start a call or recording in another app, then open the panel: the meter
+      starts by itself and the selected mic card reads "In use by <App>".
+
+## Menu bar icon
+
+- [ ] Idle on the built-in speakers, confirm the speaker's waves follow the
+      volume slider.
+- [ ] Play audio and confirm the icon becomes a still equalizer (no motion);
+      pause and confirm it returns to the idle icon once the app stops playing.
+- [ ] Mute the output and confirm `speaker.slash.fill`; mute the microphone and
+      confirm `mic.slash.fill` wins over everything else.
+- [ ] Switch to AirPods or a display and confirm the idle icon shows the device.
+- [ ] Confirm the icon reads well on light and dark menu bars and when pressed.
 
 ## Robustness
 

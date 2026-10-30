@@ -1,20 +1,92 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "Apps": {
-      "comment": "Panel section heading: the apps currently playing audio.",
+    "Aggregate": {
+      "comment": "Device transport: aggregate device.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apps"
+            "value": "Aggregate"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apps"
+            "value": "Agregado"
+          }
+        }
+      }
+    },
+    "AirPlay": {
+      "comment": "Device transport.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AirPlay"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AirPlay"
+          }
+        }
+      }
+    },
+    "Bluetooth": {
+      "comment": "Device transport.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bluetooth"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bluetooth"
+          }
+        }
+      }
+    },
+    "Built-in": {
+      "comment": "Device transport: built into the Mac.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Built-in"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Integrado"
+          }
+        }
+      }
+    },
+    "DisplayPort": {
+      "comment": "Device transport.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DisplayPort"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "DisplayPort"
           }
         }
       }
@@ -33,6 +105,96 @@
           "stringUnit": {
             "state": "translated",
             "value": "Earshot"
+          }
+        }
+      }
+    },
+    "HDMI": {
+      "comment": "Device transport.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HDMI"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HDMI"
+          }
+        }
+      }
+    },
+    "Hide input level": {
+      "comment": "Help of the button that stops the microphone level meter.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide input level"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar nível de entrada"
+          }
+        }
+      }
+    },
+    "Hide other devices": {
+      "comment": "Help for the selected device card when the other devices are shown.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide other devices"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocultar outros dispositivos"
+          }
+        }
+      }
+    },
+    "In use by %@": {
+      "comment": "Subtitle of the selected microphone while another app captures it. The argument is the app name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In use by %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Em uso por %@"
+          }
+        }
+      }
+    },
+    "In use by %@ and %lld more": {
+      "comment": "Subtitle of the selected microphone while several apps capture it. Arguments: first app name, number of other apps.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In use by %@ and %lld more"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Em uso por %@ e mais %lld"
           }
         }
       }
@@ -73,24 +235,6 @@
         }
       }
     },
-    "Monitor level": {
-      "comment": "Toggle in the Microphone section that turns the live input level meter on.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Monitor level"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Monitorar nível"
-          }
-        }
-      }
-    },
     "Mute": {
       "localizations": {
         "en": {
@@ -103,6 +247,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "Silenciar"
+          }
+        }
+      }
+    },
+    "Muted": {
+      "comment": "Shown instead of a volume percentage when muted.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muted"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mudo"
+          }
+        }
+      }
+    },
+    "Next track": {
+      "comment": "Now playing card button: skip to the next track.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next track"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Próxima faixa"
           }
         }
       }
@@ -143,6 +323,42 @@
         }
       }
     },
+    "Nothing playing": {
+      "comment": "Title of the empty now playing state.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing playing"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nada tocando"
+          }
+        }
+      }
+    },
+    "Other": {
+      "comment": "Device transport: unknown.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outro"
+          }
+        }
+      }
+    },
     "Output": {
       "comment": "Panel section heading: master volume and output device.",
       "extractionState": "manual",
@@ -157,6 +373,96 @@
           "stringUnit": {
             "state": "translated",
             "value": "Saída"
+          }
+        }
+      }
+    },
+    "Pause": {
+      "comment": "Now playing card button: pause playback.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausar"
+          }
+        }
+      }
+    },
+    "Play": {
+      "comment": "Now playing card button: resume playback.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproduzir"
+          }
+        }
+      }
+    },
+    "Playing now": {
+      "comment": "Panel section heading: the apps currently playing audio.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playing now"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tocando agora"
+          }
+        }
+      }
+    },
+    "Press play in any app to control it here.": {
+      "comment": "Hint of the empty now playing state.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press play in any app to control it here."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dê play em qualquer app para controlar aqui."
+          }
+        }
+      }
+    },
+    "Previous track": {
+      "comment": "Now playing card button: go to the previous track.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous track"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faixa anterior"
           }
         }
       }
@@ -179,6 +485,42 @@
         }
       }
     },
+    "Show input level": {
+      "comment": "Help of the button that starts the microphone level meter.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show input level"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar nível de entrada"
+          }
+        }
+      }
+    },
+    "Show other devices": {
+      "comment": "Help for the selected device card when the other devices are hidden.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show other devices"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar outros dispositivos"
+          }
+        }
+      }
+    },
     "Software volume": {
       "comment": "Caption under the master slider when the output device has no hardware volume.",
       "extractionState": "manual",
@@ -197,6 +539,42 @@
         }
       }
     },
+    "Sound Settings…": {
+      "comment": "Footer button that opens System Settings > Sound.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound Settings…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes de Som…"
+          }
+        }
+      }
+    },
+    "Thunderbolt": {
+      "comment": "Device transport.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thunderbolt"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thunderbolt"
+          }
+        }
+      }
+    },
     "Unmute": {
       "localizations": {
         "en": {
@@ -209,6 +587,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reativar som"
+          }
+        }
+      }
+    },
+    "USB": {
+      "comment": "Device transport.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "USB"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "USB"
+          }
+        }
+      }
+    },
+    "Virtual": {
+      "comment": "Device transport: software device.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Virtual"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Virtual"
           }
         }
       }

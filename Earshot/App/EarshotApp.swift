@@ -21,6 +21,14 @@ struct EarshotApp: App {
     /// the user turns it on.
     @State private var input: InputModel
 
+    /// The now playing model, shared with the panel and started at launch. It
+    /// stops its adapter process when the app terminates.
+    @State private var nowPlaying: NowPlayingModel
+
+    /// The menu bar icon, derived from the output, input and playing apps
+    /// models (DESIGN §4).
+    @State private var menuBarIcon: MenuBarIconModel
+
     init() {
         let model = PlayingAppsModel(
             monitor: CoreAudioProcessMonitor(),
@@ -34,18 +42,32 @@ struct EarshotApp: App {
             controller: CoreAudioDeviceController(direction: .input),
             meter: AVAudioEngineLevelMeter()
         )
+        let nowPlayingModel = NowPlayingModel(source: MediaRemoteAdapterSource())
         _output = State(initialValue: outputModel)
         _input = State(initialValue: inputModel)
+        _nowPlaying = State(initialValue: nowPlayingModel)
+        let iconModel = MenuBarIconModel(output: outputModel, input: inputModel, playingApps: model)
+        _menuBarIcon = State(initialValue: iconModel)
         model.start()
         outputModel.start()
         inputModel.start()
+        iconModel.start()
+        // The unit tests run inside the app as their host, which is killed
+        // without a graceful quit; it must not spawn the adapter's perl process.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+            nowPlayingModel.start()
+        }
     }
 
     var body: some Scene {
         MenuBarExtra {
-            PanelView(playingApps: playingApps, output: output, input: input)
+            PanelView(nowPlaying: nowPlaying, playingApps: playingApps, output: output, input: input)
         } label: {
-            Label("Earshot", systemImage: input.isMuted ? "mic.slash.fill" : "speaker.wave.2")
+            Label {
+                Text("Earshot")
+            } icon: {
+                Image(nsImage: menuBarIcon.image)
+            }
         }
         .menuBarExtraStyle(.window)
     }

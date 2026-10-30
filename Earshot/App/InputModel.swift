@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// Owns the "Microphone" section: the input device picker, the input volume,
-/// mute and the opt-in level meter.
+/// Owns the "Microphone" section: the input device cards, the input volume,
+/// mute and the level meter.
 ///
 /// Volume and mute go straight to the selected input's hardware controls
 /// (DESIGN §2). Mute rules:
@@ -12,8 +12,12 @@ import Observation
 ///   the slider while muted unmutes.
 /// - Otherwise the device cannot be muted (`canMute == false`).
 ///
-/// Level metering captures the microphone, so it is off by default, not
-/// persisted, and runs only while `isMonitoring` is on.
+/// Level metering captures the microphone, so it runs only while the panel is
+/// visible, and then only when it costs nothing extra or the user asks
+/// (DESIGN §2): automatically while another app already uses the microphone
+/// (the privacy indicator is on and Bluetooth headsets are already in hands-free
+/// mode), otherwise only after `toggleManualMonitoring()`. Nothing is
+/// persisted.
 @MainActor
 @Observable
 final class InputModel {
@@ -46,12 +50,22 @@ final class InputModel {
     /// access denied). Cleared when monitoring is turned on again or off.
     private(set) var meterError = false
 
+    /// Whether another app (not Earshot) is currently capturing the microphone.
+    /// While it is, the meter runs by itself and the manual button is hidden.
+    private(set) var otherAppsUsingMic = false
+
     private let controller: any AudioDeviceController
     private let meter: any InputLevelMeter
     private var isRunning = false
 
     /// Whether the selected device has a settable hardware mute.
     @ObservationIgnored private var hasHardwareMute = false
+
+    /// Whether the panel is on screen. The meter never runs without it.
+    @ObservationIgnored private var isPanelVisible = false
+
+    /// Whether the user started the meter by hand. Reset when the panel hides.
+    @ObservationIgnored private var isManuallyMonitoring = false
 
     /// The volume to restore when unmuting a device muted through volume 0.
     @ObservationIgnored private var volumeBeforeMute: Float?
@@ -124,6 +138,43 @@ final class InputModel {
         refresh()
     }
 
+    // MARK: Meter policy
+
+    /// The panel became visible: the meter may start (see the type docs).
+    func panelDidAppear() {
+        isPanelVisible = true
+        reconcileMeter()
+    }
+
+    /// The panel was hidden: the meter stops and the manual choice is forgotten.
+    func panelDidDisappear() {
+        isPanelVisible = false
+        isManuallyMonitoring = false
+        reconcileMeter()
+    }
+
+    /// Reports whether another app is capturing the microphone. Starts the
+    /// meter while the panel is visible, and stops it again once the other app
+    /// is gone, unless the user started it by hand.
+    func setOtherAppsUsingMic(_ using: Bool) {
+        guard using != otherAppsUsingMic else { return }
+        otherAppsUsingMic = using
+        reconcileMeter()
+    }
+
+    /// Starts the meter by hand, or stops it when it is already running.
+    /// Retries after a failed start. Does nothing while the panel is hidden.
+    func toggleManualMonitoring() {
+        guard isPanelVisible else { return }
+        if isMonitoring {
+            isManuallyMonitoring = false
+            setMonitoring(false)
+        } else {
+            isManuallyMonitoring = true
+            reconcileMeter(retryAfterError: true)
+        }
+    }
+
     /// Turns the level meter on or off. Turning it on clears a previous error;
     /// if the meter cannot start, monitoring stays off and `meterError` is set.
     func setMonitoring(_ on: Bool) {
@@ -148,6 +199,16 @@ final class InputModel {
     }
 
     // MARK: Private
+
+    /// Starts or stops the meter to match the policy. A failed start is not
+    /// retried by itself (`meterError`), so a denied permission does not prompt
+    /// on every change.
+    private func reconcileMeter(retryAfterError: Bool = false) {
+        let wanted = isPanelVisible && (otherAppsUsingMic || isManuallyMonitoring)
+        guard wanted != isMonitoring else { return }
+        if wanted, meterError, !retryAfterError { return }
+        setMonitoring(wanted)
+    }
 
     /// The meter gave up after starting (permission denied at the prompt).
     private func meterFailed() {

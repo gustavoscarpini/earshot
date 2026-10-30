@@ -8,6 +8,9 @@ keeping another loud, and some outputs (like HDMI monitors) expose no volume
 control at all. Earshot fixes that from the menu bar, using Core Audio Process
 Taps — no virtual audio driver, no kernel extension.
 
+The panel header shows the current track with a progress bar and previous,
+play/pause and next buttons.
+
 See [`docs/DESIGN.md`](docs/DESIGN.md) for the full design and the reasoning
 behind each decision.
 
@@ -90,6 +93,13 @@ The Core Audio layer sits behind the `AudioProcessMonitor`, `TapController`, and
 
 A manual checklist covering the scenarios that need real hardware lives in
 [`docs/manual-test.md`](docs/manual-test.md).
+
+## Third-party
+
+The now playing header uses [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter)
+by Jonas van den Berg, vendored in `Vendor/mediaremote-adapter/` and built into
+the app. It is licensed under the BSD 3-Clause License; see
+[`Vendor/mediaremote-adapter/LICENSE`](Vendor/mediaremote-adapter/LICENSE).
 
 ## License
 

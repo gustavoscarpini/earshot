@@ -8,8 +8,8 @@ struct OutputModelTests {
     private let suiteName = "OutputModelTests.\(UUID().uuidString)"
     private let defaults: UserDefaults
 
-    private let speakers = AudioDevice(uid: "speakers", name: "Speakers")
-    private let hdmi = AudioDevice(uid: "hdmi", name: "HDMI")
+    private let speakers = AudioDevice(uid: "speakers", name: "Speakers", transport: .builtIn)
+    private let hdmi = AudioDevice(uid: "hdmi", name: "HDMI", transport: .hdmi)
 
     init() {
         defaults = UserDefaults(suiteName: suiteName)!

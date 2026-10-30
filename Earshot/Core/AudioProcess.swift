@@ -24,4 +24,8 @@ struct AudioProcess: Equatable, Sendable {
     /// Whether the process is currently producing audio output
     /// (`kAudioProcessPropertyIsRunningOutput`).
     let isRunningOutput: Bool
+
+    /// Whether the process is currently capturing audio input
+    /// (`kAudioProcessPropertyIsRunningInput`).
+    let isRunningInput: Bool
 }

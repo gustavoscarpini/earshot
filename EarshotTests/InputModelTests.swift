@@ -6,8 +6,8 @@ import Testing
 struct InputModelTests {
     private struct MeterFailure: Error {}
 
-    private let builtIn = AudioDevice(uid: "builtin", name: "MacBook Microphone")
-    private let usb = AudioDevice(uid: "usb", name: "USB Mic")
+    private let builtIn = AudioDevice(uid: "builtin", name: "MacBook Microphone", transport: .builtIn)
+    private let usb = AudioDevice(uid: "usb", name: "USB Mic", transport: .usb)
 
     /// `builtin` has hardware volume and no mute; `usb` has neither.
     private func makeController(defaultUID: String = "builtin") -> FakeAudioDeviceController {
@@ -211,5 +211,117 @@ struct InputModelTests {
 
         #expect(controller.startCallCount == 1)
         #expect(controller.stopCallCount == 1)
+    }
+
+    // MARK: Meter policy
+
+    @Test func meterStartsAutomaticallyWhenAnotherAppUsesTheMicWithThePanelOpen() {
+        let meter = FakeInputLevelMeter()
+        let model = makeModel(makeController(), meter: meter)
+        model.start()
+
+        model.setOtherAppsUsingMic(true)
+        #expect(!model.isMonitoring)
+
+        model.panelDidAppear()
+        #expect(model.isMonitoring)
+        #expect(model.otherAppsUsingMic)
+        #expect(meter.isRunning)
+    }
+
+    @Test func meterStopsWhenTheOtherAppLeavesUnlessStartedManually() {
+        let meter = FakeInputLevelMeter()
+        let model = makeModel(makeController(), meter: meter)
+        model.start()
+        model.panelDidAppear()
+
+        model.setOtherAppsUsingMic(true)
+        #expect(model.isMonitoring)
+        model.setOtherAppsUsingMic(false)
+        #expect(!model.isMonitoring)
+        #expect(!meter.isRunning)
+
+        model.toggleManualMonitoring()
+        model.setOtherAppsUsingMic(true)
+        model.setOtherAppsUsingMic(false)
+        #expect(model.isMonitoring)
+    }
+
+    @Test func manualToggleStartsAndStopsTheMeter() {
+        let meter = FakeInputLevelMeter()
+        let model = makeModel(makeController(), meter: meter)
+        model.start()
+        model.panelDidAppear()
+        #expect(!model.isMonitoring)
+
+        model.toggleManualMonitoring()
+        #expect(model.isMonitoring)
+
+        model.toggleManualMonitoring()
+        #expect(!model.isMonitoring)
+        #expect(!meter.isRunning)
+    }
+
+    @Test func manualToggleDoesNothingWhileThePanelIsHidden() {
+        let meter = FakeInputLevelMeter()
+        let model = makeModel(makeController(), meter: meter)
+        model.start()
+
+        model.toggleManualMonitoring()
+
+        #expect(!model.isMonitoring)
+        #expect(meter.startCallCount == 0)
+    }
+
+    @Test func hidingThePanelStopsTheMeterAndForgetsTheManualChoice() {
+        let meter = FakeInputLevelMeter()
+        let model = makeModel(makeController(), meter: meter)
+        model.start()
+        model.panelDidAppear()
+        model.toggleManualMonitoring()
+        #expect(model.isMonitoring)
+
+        model.panelDidDisappear()
+        #expect(!model.isMonitoring)
+        #expect(!meter.isRunning)
+
+        model.panelDidAppear()
+        #expect(!model.isMonitoring)
+    }
+
+    @Test func hidingThePanelStopsTheAutomaticMeter() {
+        let meter = FakeInputLevelMeter()
+        let model = makeModel(makeController(), meter: meter)
+        model.start()
+        model.panelDidAppear()
+        model.setOtherAppsUsingMic(true)
+        #expect(model.isMonitoring)
+
+        model.panelDidDisappear()
+
+        #expect(!model.isMonitoring)
+        #expect(!meter.isRunning)
+    }
+
+    @Test func failedAutomaticStartIsNotRetriedUntilTheUserAsks() {
+        let meter = FakeInputLevelMeter()
+        meter.startError = MeterFailure()
+        let model = makeModel(makeController(), meter: meter)
+        model.start()
+        model.panelDidAppear()
+
+        model.setOtherAppsUsingMic(true)
+        #expect(model.meterError)
+        #expect(!model.isMonitoring)
+
+        // Another change must not prompt again.
+        model.setOtherAppsUsingMic(false)
+        model.setOtherAppsUsingMic(true)
+        #expect(meter.startCallCount == 0)
+
+        meter.startError = nil
+        model.toggleManualMonitoring()
+        #expect(model.isMonitoring)
+        #expect(!model.meterError)
     }
 }

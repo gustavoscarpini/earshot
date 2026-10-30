@@ -16,14 +16,16 @@ struct PlayingAppsModelTests {
         pid: pid_t,
         bundleID: String? = nil,
         executablePath: String? = nil,
-        isRunningOutput: Bool = true
+        isRunningOutput: Bool = true,
+        isRunningInput: Bool = false
     ) -> AudioProcess {
         AudioProcess(
             objectID: UInt32(pid) + 1_000,
             pid: pid,
             bundleID: bundleID,
             executablePath: executablePath,
-            isRunningOutput: isRunningOutput
+            isRunningOutput: isRunningOutput,
+            isRunningInput: isRunningInput
         )
     }
 
@@ -314,5 +316,83 @@ struct PlayingAppsModelTests {
 
         #expect(grouped.map(\.id) == ["/Applications/A.app", "com.example.b"])
         #expect(grouped.map(\.name) == ["A", "com.example.b"])
+    }
+
+    // MARK: Microphone users
+
+    @Test func micUsersAreGroupedLikePlayingApps() {
+        let processes = [
+            process(pid: 1, executablePath: "/Applications/Zoom.app/Contents/MacOS/zoom", isRunningOutput: false, isRunningInput: true),
+            process(
+                pid: 2,
+                executablePath: "/Applications/Zoom.app/Contents/Frameworks/Helper.app/Contents/MacOS/Helper",
+                isRunningOutput: false,
+                isRunningInput: true
+            ),
+            process(pid: 3, executablePath: "/Applications/B.app/Contents/MacOS/B", isRunningOutput: true, isRunningInput: true),
+            process(pid: 4, executablePath: "/Applications/C.app/Contents/MacOS/C", isRunningOutput: true, isRunningInput: false)
+        ]
+
+        let names = PlayingAppsModel.micUserNames(processes, ownPID: 999, ownBundleID: nil) {
+            ($0 as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "")
+        }
+
+        #expect(names == ["Zoom", "B"])
+    }
+
+    @Test func micUsersExcludeEarshotItself() {
+        let processes = [
+            process(pid: 10, bundleID: "com.example.earshot", executablePath: "/Applications/Earshot.app/Contents/MacOS/Earshot", isRunningInput: true),
+            process(pid: 11, bundleID: "com.example.earshot.helper", executablePath: "/Applications/Earshot.app/Contents/MacOS/Helper", isRunningInput: true),
+            process(pid: 12, bundleID: "com.example.other", executablePath: "/Applications/Other.app/Contents/MacOS/Other", isRunningInput: true),
+            process(pid: 13, bundleID: "com.example.unrelated", executablePath: "/Applications/Unrelated.app/Contents/MacOS/Unrelated", isRunningInput: true)
+        ]
+
+        let names = PlayingAppsModel.micUserNames(processes, ownPID: 13, ownBundleID: "com.example.earshot") { $0 }
+
+        #expect(names == ["/Applications/Other.app"])
+    }
+
+    @Test func micUsersIgnoreDaemonsOutsideAnAppBundle() {
+        let processes = [
+            process(
+                pid: 20,
+                bundleID: "com.apple.CoreSpeech",
+                executablePath: "/System/Library/PrivateFrameworks/CoreSpeech.framework/corespeechd",
+                isRunningInput: true
+            ),
+            process(pid: 21, bundleID: "com.example.nopath", isRunningInput: true)
+        ]
+
+        #expect(PlayingAppsModel.micUserNames(processes, ownPID: 999, ownBundleID: nil) { $0 }.isEmpty)
+    }
+
+    @Test func noMicUsersWhenNobodyCaptures() {
+        let names = PlayingAppsModel.micUserNames(
+            [process(pid: 1, bundleID: "com.example.a")],
+            ownPID: 999,
+            ownBundleID: nil
+        ) { $0 }
+
+        #expect(names.isEmpty)
+        #expect(PlayingAppsModel.micUserNames([], ownPID: 999, ownBundleID: nil) { $0 }.isEmpty)
+    }
+
+    @Test func modelPublishesMicUsersAndClearsThem() {
+        let monitor = FakeAudioProcessMonitor()
+        monitor.processesToReturn = [
+            process(pid: 1, executablePath: "/Applications/A.app/Contents/MacOS/A", isRunningOutput: false, isRunningInput: true)
+        ]
+        let model = makeModel(monitor, clock: Clock(t0))
+        model.start()
+
+        #expect(model.micUsers.count == 1)
+
+        monitor.processesToReturn = [
+            process(pid: 1, executablePath: "/Applications/A.app/Contents/MacOS/A", isRunningOutput: false, isRunningInput: false)
+        ]
+        monitor.simulateChange()
+
+        #expect(model.micUsers.isEmpty)
     }
 }

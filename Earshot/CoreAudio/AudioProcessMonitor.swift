@@ -1,9 +1,11 @@
 import Foundation
 
-/// Observes which apps are currently producing audio output.
+/// Observes which apps are currently producing audio output or capturing audio
+/// input.
 ///
 /// Backed by Core Audio process objects and their
-/// `kAudioProcessPropertyIsRunningOutput` property (DESIGN §1). The list of
+/// `kAudioProcessPropertyIsRunningOutput` and `kAudioProcessPropertyIsRunningInput`
+/// properties (DESIGN §1, §2). The list of
 /// "apps currently playing" is derived from these process objects, never from
 /// the taps themselves.
 ///
@@ -12,10 +14,10 @@ import Foundation
 @MainActor
 protocol AudioProcessMonitor: AnyObject {
     /// Starts observing changes to the process list and to each process's
-    /// running-output state.
+    /// running-output and running-input state.
     ///
     /// - Parameter onChange: Called on the main actor whenever the process list
-    ///   or any process's running-output state changes.
+    ///   or any process's running-output or running-input state changes.
     func start(onChange: @escaping @MainActor () -> Void)
 
     /// Stops observing changes and removes every property listener.

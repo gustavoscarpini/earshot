@@ -114,3 +114,32 @@ final class FakeInputLevelMeter: InputLevelMeter {
         onFailure?()
     }
 }
+
+/// Test double for `NowPlayingSource` that records starts, stops and sent
+/// commands, and emits infos on demand.
+@MainActor
+final class FakeNowPlayingSource: NowPlayingSource {
+    private(set) var startCallCount = 0
+    private(set) var stopCallCount = 0
+    private(set) var sentCommands: [NowPlayingCommand] = []
+    private var onChange: (@MainActor (NowPlayingInfo?) -> Void)?
+
+    func start(onChange: @escaping @MainActor (NowPlayingInfo?) -> Void) {
+        self.onChange = onChange
+        startCallCount += 1
+    }
+
+    func stop() {
+        onChange = nil
+        stopCallCount += 1
+    }
+
+    func send(_ command: NowPlayingCommand) {
+        sentCommands.append(command)
+    }
+
+    /// Reports `info`, as the real source would when the item changes.
+    func emit(_ info: NowPlayingInfo?) {
+        onChange?(info)
+    }
+}

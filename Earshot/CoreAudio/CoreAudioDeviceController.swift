@@ -17,6 +17,11 @@ final class CoreAudioDeviceController: AudioDeviceController {
     /// UIDs starting with this prefix belong to Earshot's own private aggregates.
     private static let ownUIDPrefix = "com.gustavoscarpini.Earshot"
 
+    /// UID prefix of the private aggregate Core Audio creates for an
+    /// `AVAudioEngine` client (e.g. Earshot's own level meter); never a device
+    /// the user can pick.
+    private static let engineAggregateUIDPrefix = "CADefaultDeviceAggregate-"
+
     /// Which side of the hardware this controller manages. It picks the stream
     /// scope that filters devices, the scope of the volume and mute controls and
     /// the default-device selector.
@@ -51,10 +56,11 @@ final class CoreAudioDeviceController: AudioDeviceController {
             guard hasStreams(device),
                   !isHidden(device),
                   let uid = uid(of: device),
-                  !uid.hasPrefix(Self.ownUIDPrefix) else {
+                  !uid.hasPrefix(Self.ownUIDPrefix),
+                  !uid.hasPrefix(Self.engineAggregateUIDPrefix) else {
                 return nil
             }
-            return AudioDevice(uid: uid, name: name(of: device) ?? uid)
+            return AudioDevice(uid: uid, name: name(of: device) ?? uid, transport: transport(of: device))
         }
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
@@ -318,6 +324,28 @@ final class CoreAudioDeviceController: AudioDeviceController {
         var size = UInt32(MemoryLayout<UInt32>.size)
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr else { return false }
         return value != 0
+    }
+
+    /// Maps the device's `kAudioDevicePropertyTransportType` to `AudioTransport`;
+    /// an unreadable or unknown type is `.other`.
+    private func transport(of device: AudioObjectID) -> AudioTransport {
+        var address = Self.address(kAudioDevicePropertyTransportType)
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr else { return .other }
+        switch value {
+        case kAudioDeviceTransportTypeBuiltIn: return .builtIn
+        case kAudioDeviceTransportTypeUSB: return .usb
+        case kAudioDeviceTransportTypeBluetooth: return .bluetooth
+        case kAudioDeviceTransportTypeBluetoothLE: return .bluetoothLE
+        case kAudioDeviceTransportTypeHDMI: return .hdmi
+        case kAudioDeviceTransportTypeDisplayPort: return .displayPort
+        case kAudioDeviceTransportTypeAirPlay: return .airPlay
+        case kAudioDeviceTransportTypeThunderbolt: return .thunderbolt
+        case kAudioDeviceTransportTypeVirtual: return .virtual
+        case kAudioDeviceTransportTypeAggregate, kAudioDeviceTransportTypeAutoAggregate: return .aggregate
+        default: return .other
+        }
     }
 
     private func uid(of device: AudioObjectID) -> String? {

@@ -15,24 +15,28 @@ Earshot is an open-source macOS menu bar app for per-app volume control, output 
 ### 2. Microphone: device-level control
 - Input gain via `kAudioDevicePropertyVolumeScalar` (input scope) on the selected input device.
 - Global mic mute.
-- Input device picker (changes the system default input).
-- Real-time input level meter.
+- Input device cards (tapping one changes the system default input). The selected card reads "In use by <App>" with an orange dot while another app is capturing the microphone (`kAudioProcessPropertyIsRunningInput`; Earshot's own capture is excluded).
+- Real-time input level meter, only while the panel is visible. It starts **by itself while another app already uses the microphone** (the privacy indicator is on and Bluetooth headsets are already in hands-free mode, so it costs nothing extra). Otherwise it is off, and a small waveform button in the Microphone section starts and stops it by hand. It always stops when the panel closes.
 - Devices that expose no hardware input volume (common with USB mics) show the slider disabled with a "not supported by this device" hint; mute still works.
 - Out of scope: per-app mic control and software gain above 100% (both would require a virtual driver).
 
 ### 3. Output device and master volume
 - Follow the system default output device; rebuild taps when it changes.
-- Output device picker in the UI.
+- Output device cards in the UI (a card per device: symbol, name, connection type; the selected one is highlighted).
 - Hybrid master volume: use the device's hardware volume when available, fall back to a software master when not (e.g. HDMI displays).
 
 ### 4. UI: menu bar only
 - `MenuBarExtra` with `.window` style, no Dock icon (`LSUIElement`).
-- Panel layout, top to bottom:
-  1. Master volume + output device picker
-  2. Apps currently playing — icon, name, slider, mute
-  3. Microphone — input picker, slider, mute, level meter
+- Panel layout (340 pt wide, material background, sections separated by thin dividers), top to bottom:
+  1. Header: the now playing track with artwork, progress and transport buttons, or an empty state when nothing plays (see §13)
+  2. Output — device cards, then mute button and master volume slider
+  3. Playing now — apps currently playing: icon, name, slider, mute (room for a per-app level meter)
+  4. Microphone — input device cards, mute button and input slider, level meter (see §2)
+  5. Footer: "Sound Settings…" shortcut and Quit
+  - Device cards show a connection-type subtitle (Built-in, USB, Bluetooth, ...) and an SF Symbol derived from the transport type and name. Battery level is not shown: there is no public API for it.
+- Menu bar icon: a template image derived from the audio state, most important first — muted microphone (`mic.slash.fill`), muted output (`speaker.slash.fill`), a still four-bar equalizer while any app plays (deliberately not animated, to keep the menu bar calm), the output device's symbol when idle on an external output, otherwise a speaker whose waves follow the volume. No mic-in-use badge: macOS already shows its orange indicator.
 - An app that stops playing stays in the list for **10 seconds**, dimmed, before disappearing (so sliders don't vanish under the cursor on pause).
-- Small Settings screen for options (keyboard, launch at login, shortcuts).
+- A small Settings screen for options (keyboard, launch at login, shortcuts) is planned; the panel has no gear icon until it exists.
 
 ### 5. Persistence and app grouping
 - Per-app volume is remembered by **bundle ID** and reapplied when the app plays again, across restarts. Apps never adjusted start at 100%.
@@ -89,6 +93,13 @@ Earshot is an open-source macOS menu bar app for per-app volume control, output 
 - License: MIT
 - Code, README, commits: English
 - UI localized in **en** and **pt-BR** via String Catalog (`Localizable.xcstrings`)
+
+### 13. Now playing
+- The header at the top of the panel shows the current track (artwork, title, artist, a badge with the playing app) with previous / play-pause / next buttons and a **progress bar** (elapsed on the left, remaining on the right). The header background is tinted with the artwork's average color, computed once per artwork change. The bar is estimated from the adapter's `elapsedTime`, `timestamp`, `playbackRate` and `duration` and ticks once a second only while playing; it is hidden when the duration is unknown. When nothing reports now playing info the header shows a "Nothing playing" hint. The bar is display-only: no seeking, shuffle, repeat or likes.
+- There is **no public API** for this. Apple blocks the private MediaRemote framework for third-party apps since macOS 15.4, but `/usr/bin/perl` is entitled to use it. Earshot runs the [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) Perl script (vendored in `Vendor/mediaremote-adapter/`), which loads a small helper framework into perl and prints now playing changes as JSON on stdout. Commands (`send`) go through the same script.
+- **Private API risk:** a macOS update may break the adapter. Then the header simply shows its empty state (the stream yields nothing, or the process keeps failing and Earshot gives up after a few relaunches); volume control, output and microphone are unaffected.
+- The helper framework is built from the vendored sources with plain `clang` by `Scripts/build-mediaremote-adapter.sh`, an Xcode run-script phase — no CMake or other extra tools. The framework is embedded and signed with the app.
+- The pure parts (line splitting, stream parsing, command IDs) live in `Earshot/Core/` and are tested; the process handling sits behind the `NowPlayingSource` protocol.
 
 ## Deferred to v2
 - Per-app output routing (different apps to different devices)

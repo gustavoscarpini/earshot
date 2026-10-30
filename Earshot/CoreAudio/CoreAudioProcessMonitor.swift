@@ -23,9 +23,16 @@ final class CoreAudioProcessMonitor: AudioProcessMonitor {
     /// The listener on the system object for process list changes.
     private var processListListener: AudioObjectPropertyListenerBlock?
 
-    /// The listener per process object, keyed by object, kept so it can be
+    /// The running-state selectors observed on every process object: playing
+    /// audio out and capturing audio in.
+    private static let observedSelectors = [
+        AudioObjectPropertySelector(kAudioProcessPropertyIsRunningOutput),
+        AudioObjectPropertySelector(kAudioProcessPropertyIsRunningInput)
+    ]
+
+    /// The listeners per process object and selector, kept so they can be
     /// removed again with `AudioObjectRemovePropertyListenerBlock`.
-    private var outputListeners: [AudioObjectID: AudioObjectPropertyListenerBlock] = [:]
+    private var processListeners: [AudioObjectID: [AudioObjectPropertySelector: AudioObjectPropertyListenerBlock]] = [:]
 
     // MARK: AudioProcessMonitor
 
@@ -59,11 +66,9 @@ final class CoreAudioProcessMonitor: AudioProcessMonitor {
             processListListener = nil
         }
 
-        for (object, listener) in outputListeners {
-            var address = Self.address(kAudioProcessPropertyIsRunningOutput)
-            _ = AudioObjectRemovePropertyListenerBlock(object, &address, DispatchQueue.main, listener)
+        for object in Array(processListeners.keys) {
+            removeListeners(from: object)
         }
-        outputListeners.removeAll()
     }
 
     func processes() -> [AudioProcess] {
@@ -75,7 +80,8 @@ final class CoreAudioProcessMonitor: AudioProcessMonitor {
                 pid: pid,
                 bundleID: bundleID(of: object),
                 executablePath: executablePath(of: pid),
-                isRunningOutput: isRunningOutput(of: object)
+                isRunningOutput: isRunning(kAudioProcessPropertyIsRunningOutput, of: object),
+                isRunningInput: isRunning(kAudioProcessPropertyIsRunningInput, of: object)
             )
         }
     }
@@ -87,32 +93,43 @@ final class CoreAudioProcessMonitor: AudioProcessMonitor {
     private func processListChanged() {
         let current = Set(processObjectIDs())
 
-        for object in Array(outputListeners.keys) where !current.contains(object) {
-            if let listener = outputListeners[object] {
-                var address = Self.address(kAudioProcessPropertyIsRunningOutput)
-                _ = AudioObjectRemovePropertyListenerBlock(object, &address, DispatchQueue.main, listener)
-            }
-            outputListeners[object] = nil
+        for object in Array(processListeners.keys) where !current.contains(object) {
+            removeListeners(from: object)
         }
 
-        for object in current where outputListeners[object] == nil {
-            addOutputListener(for: object)
+        for object in current where processListeners[object] == nil {
+            addListeners(to: object)
         }
 
         onChange?()
     }
 
-    /// Starts observing the running-output state of one process object.
-    private func addOutputListener(for object: AudioObjectID) {
-        var address = Self.address(kAudioProcessPropertyIsRunningOutput)
-        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            MainActor.assumeIsolated {
-                self?.onChange?()
+    /// Starts observing the running-output and running-input state of one
+    /// process object.
+    private func addListeners(to object: AudioObjectID) {
+        var listeners: [AudioObjectPropertySelector: AudioObjectPropertyListenerBlock] = [:]
+        for selector in Self.observedSelectors {
+            var address = Self.address(selector)
+            let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                MainActor.assumeIsolated {
+                    self?.onChange?()
+                }
+            }
+            if AudioObjectAddPropertyListenerBlock(object, &address, DispatchQueue.main, listener) == noErr {
+                listeners[selector] = listener
             }
         }
-        if AudioObjectAddPropertyListenerBlock(object, &address, DispatchQueue.main, listener) == noErr {
-            outputListeners[object] = listener
+        processListeners[object] = listeners
+    }
+
+    /// Stops observing one process object.
+    private func removeListeners(from object: AudioObjectID) {
+        for (selector, listener) in processListeners[object] ?? [:] {
+            var address = Self.address(selector)
+            // Removal has no recovery path; a stale listener already fails harmlessly.
+            _ = AudioObjectRemovePropertyListenerBlock(object, &address, DispatchQueue.main, listener)
         }
+        processListeners[object] = nil
     }
 
     // MARK: Property reads
@@ -169,8 +186,10 @@ final class CoreAudioProcessMonitor: AudioProcessMonitor {
         return bundleID.isEmpty ? nil : bundleID
     }
 
-    private func isRunningOutput(of object: AudioObjectID) -> Bool {
-        var address = Self.address(kAudioProcessPropertyIsRunningOutput)
+    /// Reads a boolean running-state property (`IsRunningOutput` or
+    /// `IsRunningInput`) of a process object.
+    private func isRunning(_ selector: AudioObjectPropertySelector, of object: AudioObjectID) -> Bool {
+        var address = Self.address(selector)
         var value: UInt32 = 0
         var size = UInt32(MemoryLayout<UInt32>.size)
         guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr else {
