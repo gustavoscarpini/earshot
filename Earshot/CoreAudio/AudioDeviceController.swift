@@ -1,25 +1,26 @@
 import Foundation
 
-/// Controls output devices: the device list, the system default output and its
-/// hardware volume and mute.
+/// Controls the audio devices of one direction (input or output): the device
+/// list, the system default device and its hardware volume and mute.
 ///
 /// Covers the output side from DESIGN §3 (follow the system default output,
-/// device picker, hybrid hardware/software master volume). When a device has no
+/// device picker, hybrid hardware/software master volume) and the microphone
+/// side from DESIGN §2 (input picker, input gain, mute). When an output has no
 /// settable hardware volume (e.g. many HDMI displays) the caller falls back to
 /// a software master implemented with the global tap (DESIGN §9).
 ///
-/// `CoreAudioOutputDeviceController` is the Core Audio implementation; tests use
-/// a fake conforming to this protocol.
+/// `CoreAudioDeviceController` is the Core Audio implementation; tests use a
+/// fake conforming to this protocol.
 @MainActor
-protocol OutputDeviceController: AnyObject {
-    /// The available output devices (at least one output stream), sorted by
+protocol AudioDeviceController: AnyObject {
+    /// The available devices (at least one stream in this direction), sorted by
     /// name. Hidden devices and Earshot's own private aggregates are excluded.
-    func devices() -> [OutputDevice]
+    func devices() -> [AudioDevice]
 
-    /// The UID of the current system default output device, if any.
+    /// The UID of the current system default device, if any.
     func defaultDeviceUID() -> String?
 
-    /// Changes the system default output device.
+    /// Changes the system default device.
     func setDefaultDevice(uid: String) throws
 
     /// Whether the device has a settable hardware volume.
@@ -37,11 +38,11 @@ protocol OutputDeviceController: AnyObject {
     /// Mutes or unmutes the device.
     func setHardwareMute(_ muted: Bool, uid: String) throws
 
-    /// Starts observing the device list, the default output, and the default
-    /// output's volume and mute.
+    /// Starts observing the device list, the default device, and the default
+    /// device's volume and mute.
     ///
     /// - Parameter onChange: Called on the main actor whenever the device list,
-    ///   the default output, or the default output's volume or mute changes.
+    ///   the default device, or the default device's volume or mute changes.
     func start(onChange: @escaping @MainActor () -> Void)
 
     /// Stops observing and removes every property listener.

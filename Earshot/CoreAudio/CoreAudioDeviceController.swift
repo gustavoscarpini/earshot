@@ -2,19 +2,25 @@ import AudioToolbox
 import CoreAudio
 import Foundation
 
-/// The Core Audio implementation of `OutputDeviceController`.
+/// The Core Audio implementation of `AudioDeviceController`, for either the
+/// input or the output side.
 ///
 /// Reads the HAL's devices and observes them with property listeners, all on the
 /// main actor. Every `OSStatus` is checked: a property that cannot be read or
 /// observed is skipped (or throws, for setters) rather than crashing
 /// (DESIGN §3, §11).
 @MainActor
-final class CoreAudioOutputDeviceController: OutputDeviceController {
+final class CoreAudioDeviceController: AudioDeviceController {
     /// The HAL's system object, which owns the device list and the defaults.
     private static let systemObject = AudioObjectID(kAudioObjectSystemObject)
 
     /// UIDs starting with this prefix belong to Earshot's own private aggregates.
     private static let ownUIDPrefix = "com.gustavoscarpini.Earshot"
+
+    /// Which side of the hardware this controller manages. It picks the stream
+    /// scope that filters devices, the scope of the volume and mute controls and
+    /// the default-device selector.
+    private let direction: AudioDirection
 
     /// Called on the main actor whenever something the controller cares about
     /// changes.
@@ -24,57 +30,67 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
     private var isObserving = false
 
     private var deviceListListener: AudioObjectPropertyListenerBlock?
-    private var defaultOutputListener: AudioObjectPropertyListenerBlock?
+    private var defaultDeviceListener: AudioObjectPropertyListenerBlock?
 
     /// The device whose volume and mute are observed, and its two listeners.
     private var observedDevice: AudioObjectID?
     private var volumeListener: AudioObjectPropertyListenerBlock?
     private var muteListener: AudioObjectPropertyListenerBlock?
 
-    // MARK: OutputDeviceController
+    /// Creates a controller for one side of the hardware.
+    ///
+    /// - Parameter direction: Whether to manage input or output devices.
+    init(direction: AudioDirection) {
+        self.direction = direction
+    }
 
-    func devices() -> [OutputDevice] {
+    // MARK: AudioDeviceController
+
+    func devices() -> [AudioDevice] {
         deviceIDs().compactMap { device in
-            guard hasOutputStreams(device),
+            guard hasStreams(device),
                   !isHidden(device),
                   let uid = uid(of: device),
                   !uid.hasPrefix(Self.ownUIDPrefix) else {
                 return nil
             }
-            return OutputDevice(uid: uid, name: name(of: device) ?? uid)
+            return AudioDevice(uid: uid, name: name(of: device) ?? uid)
         }
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     func defaultDeviceUID() -> String? {
-        defaultOutputDevice().flatMap(uid(of:))
+        defaultDevice().flatMap(uid(of:))
     }
 
     func setDefaultDevice(uid: String) throws {
         guard var device = deviceID(forUID: uid) else {
-            throw CoreAudioError(operation: "Find output device", status: kAudioHardwareBadDeviceError)
+            throw CoreAudioError(operation: "Find audio device", status: kAudioHardwareBadDeviceError)
         }
         let size = UInt32(MemoryLayout<AudioObjectID>.size)
 
-        var address = Self.address(kAudioHardwarePropertyDefaultOutputDevice)
+        var address = Self.address(defaultSelector)
         try Self.check(
-            "Set default output device",
+            "Set default audio device",
             AudioObjectSetPropertyData(Self.systemObject, &address, 0, nil, size, &device)
         )
 
-        // Alerts follow the default device; failing to move them is harmless.
-        var systemAddress = Self.address(kAudioHardwarePropertyDefaultSystemOutputDevice)
-        _ = AudioObjectSetPropertyData(Self.systemObject, &systemAddress, 0, nil, size, &device)
+        // Alerts follow the default output; failing to move them is harmless.
+        // There is no input counterpart.
+        if direction == .output {
+            var systemAddress = Self.address(kAudioHardwarePropertyDefaultSystemOutputDevice)
+            _ = AudioObjectSetPropertyData(Self.systemObject, &systemAddress, 0, nil, size, &device)
+        }
     }
 
     func hasHardwareVolume(uid: String) -> Bool {
         guard let device = deviceID(forUID: uid) else { return false }
-        return isSettable(device, Self.volumeAddress)
+        return isSettable(device, volumeAddress)
     }
 
     func hardwareVolume(uid: String) -> Float? {
-        guard let device = deviceID(forUID: uid), isSettable(device, Self.volumeAddress) else { return nil }
-        var address = Self.volumeAddress
+        guard let device = deviceID(forUID: uid), isSettable(device, volumeAddress) else { return nil }
+        var address = volumeAddress
         var value: Float32 = 0
         var size = UInt32(MemoryLayout<Float32>.size)
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr else { return nil }
@@ -83,19 +99,19 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
 
     func setHardwareVolume(_ volume: Float, uid: String) throws {
         guard let device = deviceID(forUID: uid) else {
-            throw CoreAudioError(operation: "Find output device", status: kAudioHardwareBadDeviceError)
+            throw CoreAudioError(operation: "Find audio device", status: kAudioHardwareBadDeviceError)
         }
-        var address = Self.volumeAddress
+        var address = volumeAddress
         var value: Float32 = min(max(volume, 0), 1)
         try Self.check(
-            "Set output volume",
+            "Set audio device volume",
             AudioObjectSetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<Float32>.size), &value)
         )
     }
 
     func hardwareMute(uid: String) -> Bool? {
-        guard let device = deviceID(forUID: uid), isSettable(device, Self.muteAddress) else { return nil }
-        var address = Self.muteAddress
+        guard let device = deviceID(forUID: uid), isSettable(device, muteAddress) else { return nil }
+        var address = muteAddress
         var value: UInt32 = 0
         var size = UInt32(MemoryLayout<UInt32>.size)
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr else { return nil }
@@ -104,12 +120,12 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
 
     func setHardwareMute(_ muted: Bool, uid: String) throws {
         guard let device = deviceID(forUID: uid) else {
-            throw CoreAudioError(operation: "Find output device", status: kAudioHardwareBadDeviceError)
+            throw CoreAudioError(operation: "Find audio device", status: kAudioHardwareBadDeviceError)
         }
-        var address = Self.muteAddress
+        var address = muteAddress
         var value: UInt32 = muted ? 1 : 0
         try Self.check(
-            "Set output mute",
+            "Set audio device mute",
             AudioObjectSetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value)
         )
     }
@@ -129,14 +145,14 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
             deviceListListener = listListener
         }
 
-        var defaultAddress = Self.address(kAudioHardwarePropertyDefaultOutputDevice)
+        var defaultAddress = Self.address(defaultSelector)
         let defaultListener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             MainActor.assumeIsolated {
-                self?.defaultOutputChanged()
+                self?.defaultDeviceChanged()
             }
         }
         if AudioObjectAddPropertyListenerBlock(Self.systemObject, &defaultAddress, DispatchQueue.main, defaultListener) == noErr {
-            defaultOutputListener = defaultListener
+            defaultDeviceListener = defaultListener
         }
 
         observeDefaultDevice()
@@ -153,10 +169,10 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
             _ = AudioObjectRemovePropertyListenerBlock(Self.systemObject, &address, DispatchQueue.main, listener)
             deviceListListener = nil
         }
-        if let listener = defaultOutputListener {
-            var address = Self.address(kAudioHardwarePropertyDefaultOutputDevice)
+        if let listener = defaultDeviceListener {
+            var address = Self.address(defaultSelector)
             _ = AudioObjectRemovePropertyListenerBlock(Self.systemObject, &address, DispatchQueue.main, listener)
-            defaultOutputListener = nil
+            defaultDeviceListener = nil
         }
         unobserveDefaultDevice()
     }
@@ -165,35 +181,35 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
 
     /// The default output moved: re-attach the volume and mute listeners to the
     /// new device and notify.
-    private func defaultOutputChanged() {
+    private func defaultDeviceChanged() {
         observeDefaultDevice()
         onChange?()
     }
 
     /// Moves the volume and mute listeners to the current default output.
     private func observeDefaultDevice() {
-        let device = defaultOutputDevice()
+        let device = defaultDevice()
         guard device != observedDevice else { return }
         unobserveDefaultDevice()
         guard let device else { return }
 
-        var volumeAddress = Self.volumeAddress
+        var volumeProperty = volumeAddress
         let volume: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             MainActor.assumeIsolated {
                 self?.onChange?()
             }
         }
-        if AudioObjectAddPropertyListenerBlock(device, &volumeAddress, DispatchQueue.main, volume) == noErr {
+        if AudioObjectAddPropertyListenerBlock(device, &volumeProperty, DispatchQueue.main, volume) == noErr {
             volumeListener = volume
         }
 
-        var muteAddress = Self.muteAddress
+        var muteProperty = muteAddress
         let mute: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             MainActor.assumeIsolated {
                 self?.onChange?()
             }
         }
-        if AudioObjectAddPropertyListenerBlock(device, &muteAddress, DispatchQueue.main, mute) == noErr {
+        if AudioObjectAddPropertyListenerBlock(device, &muteProperty, DispatchQueue.main, mute) == noErr {
             muteListener = mute
         }
 
@@ -204,11 +220,11 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
     private func unobserveDefaultDevice() {
         if let device = observedDevice {
             if let listener = volumeListener {
-                var address = Self.volumeAddress
+                var address = volumeAddress
                 _ = AudioObjectRemovePropertyListenerBlock(device, &address, DispatchQueue.main, listener)
             }
             if let listener = muteListener {
-                var address = Self.muteAddress
+                var address = muteAddress
                 _ = AudioObjectRemovePropertyListenerBlock(device, &address, DispatchQueue.main, listener)
             }
         }
@@ -226,12 +242,22 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
         AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
     }
 
-    private static var volumeAddress: AudioObjectPropertyAddress {
-        address(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: kAudioObjectPropertyScopeOutput)
+    /// The stream scope for this controller's direction.
+    private var scope: AudioObjectPropertyScope {
+        direction == .input ? kAudioObjectPropertyScopeInput : kAudioObjectPropertyScopeOutput
     }
 
-    private static var muteAddress: AudioObjectPropertyAddress {
-        address(kAudioDevicePropertyMute, scope: kAudioObjectPropertyScopeOutput)
+    /// The system-object selector of this direction's default device.
+    private var defaultSelector: AudioObjectPropertySelector {
+        direction == .input ? kAudioHardwarePropertyDefaultInputDevice : kAudioHardwarePropertyDefaultOutputDevice
+    }
+
+    private var volumeAddress: AudioObjectPropertyAddress {
+        Self.address(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, scope: scope)
+    }
+
+    private var muteAddress: AudioObjectPropertyAddress {
+        Self.address(kAudioDevicePropertyMute, scope: scope)
     }
 
     private static func check(_ operation: String, _ status: OSStatus) throws {
@@ -264,8 +290,8 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
         return devices
     }
 
-    private func defaultOutputDevice() -> AudioObjectID? {
-        var address = Self.address(kAudioHardwarePropertyDefaultOutputDevice)
+    private func defaultDevice() -> AudioObjectID? {
+        var address = Self.address(defaultSelector)
         var device = AudioObjectID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
         guard AudioObjectGetPropertyData(Self.systemObject, &address, 0, nil, &size, &device) == noErr,
@@ -280,8 +306,8 @@ final class CoreAudioOutputDeviceController: OutputDeviceController {
         deviceIDs().first { self.uid(of: $0) == uid }
     }
 
-    private func hasOutputStreams(_ device: AudioObjectID) -> Bool {
-        var address = Self.address(kAudioDevicePropertyStreams, scope: kAudioObjectPropertyScopeOutput)
+    private func hasStreams(_ device: AudioObjectID) -> Bool {
+        var address = Self.address(kAudioDevicePropertyStreams, scope: scope)
         var size: UInt32 = 0
         return AudioObjectGetPropertyDataSize(device, &address, 0, nil, &size) == noErr && size > 0
     }

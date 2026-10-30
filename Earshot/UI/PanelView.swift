@@ -4,12 +4,13 @@ import SwiftUI
 /// The menu bar panel.
 ///
 /// Layout with the three sections from the design document, top to bottom:
-/// master volume + output device, apps currently playing, and microphone (still
-/// a placeholder). The Apps section lists the apps playing audio, with their
-/// icon, name, volume slider and mute button.
+/// master volume + output device, apps currently playing, and microphone. The
+/// Apps section lists the apps playing audio, with their icon, name, volume
+/// slider and mute button.
 struct PanelView: View {
     let playingApps: PlayingAppsModel
     let output: OutputModel
+    let input: InputModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -25,7 +26,7 @@ struct PanelView: View {
             }
 
             PanelSection(title: "Microphone") {
-                Text("Input device, volume and level meter go here.")
+                InputSection(model: input)
             }
 
             Divider()
@@ -164,6 +165,108 @@ private struct OutputSection: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// The Microphone section: device picker, mute button, input slider and percent,
+/// plus the opt-in level meter.
+private struct InputSection: View {
+    let model: InputModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker(
+                "Microphone",
+                selection: Binding(
+                    get: { model.selectedUID },
+                    set: { uid in
+                        if let uid { model.select(uid: uid) }
+                    }
+                )
+            ) {
+                ForEach(model.devices) { device in
+                    Text(device.name).tag(Optional(device.uid))
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+
+            HStack(spacing: 8) {
+                Button {
+                    model.toggleMute()
+                } label: {
+                    Image(systemName: model.isMuted ? "mic.slash.fill" : "mic.fill")
+                        .frame(width: 18)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!model.canMute)
+                .help(model.canMute ? (model.isMuted ? "Unmute" : "Mute") : "Not supported by this device")
+
+                Slider(
+                    value: Binding(
+                        get: { Double(model.volume) },
+                        set: { model.setVolume(Float($0)) }
+                    ),
+                    in: 0...1
+                )
+                .controlSize(.small)
+                .disabled(model.isMuted || !model.hasHardwareVolume)
+
+                Text(model.volume, format: .percent.precision(.fractionLength(0)))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+
+            if !model.hasHardwareVolume {
+                Text("Not supported by this device")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle(
+                "Monitor level",
+                isOn: Binding(
+                    get: { model.isMonitoring },
+                    set: { model.setMonitoring($0) }
+                )
+            )
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+
+            if model.isMonitoring {
+                LevelBar(level: model.level)
+            }
+
+            if model.meterError {
+                Text("Microphone access denied")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        // The meter captures the microphone, so it only runs while the panel is
+        // visible.
+        .onDisappear {
+            model.setMonitoring(false)
+        }
+    }
+}
+
+/// A thin horizontal bar filled to `level` (`0...1`).
+private struct LevelBar: View {
+    let level: Float
+
+    var body: some View {
+        Capsule()
+            .fill(.quaternary)
+            .frame(height: 4)
+            .overlay(alignment: .leading) {
+                GeometryReader { proxy in
+                    Capsule()
+                        .fill(Color.accentColor)
+                        .frame(width: proxy.size.width * CGFloat(min(max(level, 0), 1)))
+                }
+            }
+            .clipShape(Capsule())
     }
 }
 

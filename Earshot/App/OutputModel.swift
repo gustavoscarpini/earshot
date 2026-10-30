@@ -16,7 +16,7 @@ final class OutputModel {
     private static let softwareVolumesKey = "softwareMasterVolumes"
 
     /// The available output devices, sorted by name.
-    private(set) var devices: [OutputDevice] = []
+    private(set) var devices: [AudioDevice] = []
 
     /// The UID of the current default output device, if any.
     private(set) var selectedUID: String?
@@ -36,7 +36,7 @@ final class OutputModel {
     /// device switches and at start.
     @ObservationIgnored var onSoftwareMasterChange: (@MainActor (Float) -> Void)?
 
-    private let controller: any OutputDeviceController
+    private let controller: any AudioDeviceController
     private let defaults: UserDefaults
     private var isRunning = false
 
@@ -54,7 +54,7 @@ final class OutputModel {
     /// - Parameters:
     ///   - controller: Reads and controls the output devices.
     ///   - defaults: Where software master volumes are remembered.
-    init(controller: any OutputDeviceController, defaults: UserDefaults = .standard) {
+    init(controller: any AudioDeviceController, defaults: UserDefaults = .standard) {
         self.controller = controller
         self.defaults = defaults
     }

@@ -30,15 +30,15 @@ final class InMemoryVolumeStore: VolumeStore {
     }
 }
 
-/// Test double for `OutputDeviceController` with settable devices.
+/// Test double for `AudioDeviceController` with settable devices.
 ///
 /// A test configures `devicesToReturn`, `defaultUID`, `volumes` and `mutes`
 /// (a device missing from `volumes` has no hardware volume; one missing from
 /// `mutes` has no hardware mute) and fires the change callback with
 /// `simulateChange()`.
 @MainActor
-final class FakeOutputDeviceController: OutputDeviceController {
-    var devicesToReturn: [OutputDevice] = []
+final class FakeAudioDeviceController: AudioDeviceController {
+    var devicesToReturn: [AudioDevice] = []
     var defaultUID: String?
     var volumes: [String: Float] = [:]
     var mutes: [String: Bool] = [:]
@@ -46,7 +46,7 @@ final class FakeOutputDeviceController: OutputDeviceController {
     private(set) var stopCallCount = 0
     private var onChange: (@MainActor () -> Void)?
 
-    func devices() -> [OutputDevice] { devicesToReturn }
+    func devices() -> [AudioDevice] { devicesToReturn }
 
     func defaultDeviceUID() -> String? { defaultUID }
 
@@ -75,5 +75,42 @@ final class FakeOutputDeviceController: OutputDeviceController {
     /// Fires the change callback, as the real controller would on a change.
     func simulateChange() {
         onChange?()
+    }
+}
+
+/// Test double for `InputLevelMeter` that records starts and stops.
+///
+/// A test emits levels with `emit(_:)`, makes the next `start` throw by setting
+/// `startError`, and simulates a late failure with `simulateFailure()`.
+@MainActor
+final class FakeInputLevelMeter: InputLevelMeter {
+    var onFailure: (@MainActor () -> Void)?
+    var startError: (any Error)?
+    private(set) var startCallCount = 0
+    private(set) var stopCallCount = 0
+    private(set) var isRunning = false
+    private var onLevel: (@MainActor (Float) -> Void)?
+
+    func start(onLevel: @escaping @MainActor (Float) -> Void) throws {
+        if let startError { throw startError }
+        startCallCount += 1
+        isRunning = true
+        self.onLevel = onLevel
+    }
+
+    func stop() {
+        stopCallCount += 1
+        isRunning = false
+        onLevel = nil
+    }
+
+    /// Delivers a normalized level, as the real meter would.
+    func emit(_ level: Float) {
+        onLevel?(level)
+    }
+
+    /// Fires the failure callback, as the real meter would after a denied prompt.
+    func simulateFailure() {
+        onFailure?()
     }
 }

@@ -10,10 +10,15 @@
   NSAudioCaptureUsageDescription is the System Audio Recording prompt shown when
   Earshot creates its first Core Audio process tap. Xcode 26.x does not expose an
   INFOPLIST_KEY_ for it, so it is declared here.
+
+  NSMicrophoneUsageDescription is the Microphone prompt shown the first time the
+  user turns on "Monitor level" in the panel.
 -->
 <plist version="1.0">
 <dict>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Earshot records the audio of individual apps so it can apply the volume level you set for each one.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Earshot shows your microphone's input level while you have "Monitor level" turned on; it never records or stores audio.</string>
 </dict>
 </plist>

@@ -8,16 +8,16 @@ struct OutputModelTests {
     private let suiteName = "OutputModelTests.\(UUID().uuidString)"
     private let defaults: UserDefaults
 
-    private let speakers = OutputDevice(uid: "speakers", name: "Speakers")
-    private let hdmi = OutputDevice(uid: "hdmi", name: "HDMI")
+    private let speakers = AudioDevice(uid: "speakers", name: "Speakers")
+    private let hdmi = AudioDevice(uid: "hdmi", name: "HDMI")
 
     init() {
         defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
     }
 
-    private func makeController(defaultUID: String) -> FakeOutputDeviceController {
-        let controller = FakeOutputDeviceController()
+    private func makeController(defaultUID: String) -> FakeAudioDeviceController {
+        let controller = FakeAudioDeviceController()
         controller.devicesToReturn = [hdmi, speakers]
         controller.volumes = ["speakers": 0.4]
         controller.mutes = ["speakers": false]
@@ -25,7 +25,7 @@ struct OutputModelTests {
         return controller
     }
 
-    private func makeModel(_ controller: FakeOutputDeviceController) -> OutputModel {
+    private func makeModel(_ controller: FakeAudioDeviceController) -> OutputModel {
         OutputModel(controller: controller, defaults: defaults)
     }
 

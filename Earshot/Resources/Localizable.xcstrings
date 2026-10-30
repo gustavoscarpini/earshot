@@ -37,24 +37,6 @@
         }
       }
     },
-    "Input device, volume and level meter go here.": {
-      "comment": "Placeholder text in the Microphone panel section.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Input device, volume and level meter go here."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O dispositivo de entrada, o volume e o medidor de nível ficam aqui."
-          }
-        }
-      }
-    },
     "Microphone": {
       "comment": "Panel section heading: microphone controls.",
       "extractionState": "manual",
@@ -69,6 +51,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "Microfone"
+          }
+        }
+      }
+    },
+    "Microphone access denied": {
+      "comment": "Caption shown when the level meter could not start because microphone access was denied.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone access denied"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acesso ao microfone negado"
+          }
+        }
+      }
+    },
+    "Monitor level": {
+      "comment": "Toggle in the Microphone section that turns the live input level meter on.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitor level"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitorar nível"
           }
         }
       }
@@ -103,6 +121,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhum app está tocando áudio no momento."
+          }
+        }
+      }
+    },
+    "Not supported by this device": {
+      "comment": "Caption/help shown when the input device has no hardware volume or mute.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not supported by this device"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não suportado por este dispositivo"
           }
         }
       }
