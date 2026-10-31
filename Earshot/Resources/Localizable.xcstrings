@@ -37,6 +37,42 @@
         }
       }
     },
+    "Allow in Accessibility settings…": {
+      "comment": "Settings menu item shown when the volume keys lack the Accessibility permission; opens System Settings.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow in Accessibility settings…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permitir nos ajustes de Acessibilidade…"
+          }
+        }
+      }
+    },
+    "Allow in Login Items settings…": {
+      "comment": "Settings menu item shown when launch at login awaits approval; opens System Settings.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow in Login Items settings…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permitir nos ajustes de Itens de Login…"
+          }
+        }
+      }
+    },
     "Bluetooth": {
       "comment": "Device transport.",
       "extractionState": "manual",
@@ -199,6 +235,24 @@
         }
       }
     },
+    "Launch at Login": {
+      "comment": "Settings menu toggle: open Earshot when the user logs in.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Launch at Login"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir ao iniciar sessão"
+          }
+        }
+      }
+    },
     "Microphone": {
       "comment": "Panel section heading: microphone controls.",
       "extractionState": "manual",
@@ -247,6 +301,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "Silenciar"
+          }
+        }
+      }
+    },
+    "Mute (%@)": {
+      "comment": "Tooltip of the microphone mute button. The argument is the global shortcut.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mute (%@)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenciar (%@)"
+          }
+        }
+      }
+    },
+    "Mute Microphone": {
+      "comment": "Settings menu item that mutes the microphone; also bound to the global shortcut ⌃⌘M.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mute Microphone"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silenciar microfone"
           }
         }
       }
@@ -485,6 +575,24 @@
         }
       }
     },
+    "Settings": {
+      "comment": "Tooltip and accessibility label of the gear menu in the panel footer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        }
+      }
+    },
     "Show input level": {
       "comment": "Help of the button that starts the microphone level meter.",
       "extractionState": "manual",
@@ -591,6 +699,42 @@
         }
       }
     },
+    "Unmute (%@)": {
+      "comment": "Tooltip of the microphone mute button while muted. The argument is the global shortcut.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unmute (%@)"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reativar som (%@)"
+          }
+        }
+      }
+    },
+    "Unmute Microphone": {
+      "comment": "Settings menu item that unmutes the microphone; also bound to the global shortcut ⌃⌘M.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unmute Microphone"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reativar microfone"
+          }
+        }
+      }
+    },
     "USB": {
       "comment": "Device transport.",
       "extractionState": "manual",
@@ -605,6 +749,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "USB"
+          }
+        }
+      }
+    },
+    "Use volume keys for outputs without hardware volume": {
+      "comment": "Settings menu toggle: the volume keys drive the software master on outputs such as HDMI monitors.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use volume keys for outputs without hardware volume"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar as teclas de volume em saídas sem volume por hardware"
           }
         }
       }

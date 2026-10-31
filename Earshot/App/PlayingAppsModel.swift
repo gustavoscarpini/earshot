@@ -27,6 +27,14 @@ final class PlayingAppsModel {
     /// Muted app ids. Session-only, and cleared once an app leaves the list.
     private(set) var mutedIDs: Set<String> = []
 
+    /// Whether the panel is on screen. Per-app meters exist only then
+    /// (DESIGN §14).
+    private(set) var isPanelVisible = false
+
+    /// Smoothed meter levels by app id, `0...1`. Empty unless the panel is
+    /// visible.
+    private(set) var levels: [String: Float] = [:]
+
     /// The software master gain from the output device, `0...1`; `1` when the
     /// output has hardware volume.
     @ObservationIgnored private var softwareMaster: Float = 1
@@ -40,6 +48,8 @@ final class PlayingAppsModel {
     private let ownBundleID: String?
     private var tracker = PlayingAppsTracker()
     private var timer: Timer?
+    private var levelTimer: Timer?
+    @ObservationIgnored private var smoother = LevelSmoother()
     private var terminationObserver: (any NSObjectProtocol)?
     private var isRunning = false
 
@@ -49,6 +59,13 @@ final class PlayingAppsModel {
 
     /// App id → every Core Audio process object of that app, playing or not.
     @ObservationIgnored private var processObjectIDs: [String: [UInt32]] = [:]
+
+    /// Like `processObjectIDs`, without Earshot's own processes: the objects a
+    /// meter-only tap may read.
+    @ObservationIgnored private var meterObjectIDs: [String: [UInt32]] = [:]
+
+    /// How often the meters are polled while the panel is visible.
+    static let levelPollInterval: TimeInterval = 1.0 / 25
 
     /// Creates the model.
     ///
@@ -92,6 +109,7 @@ final class PlayingAppsModel {
             self?.refresh()
         }
         refresh()
+        startLevelPolling()
 
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -121,14 +139,69 @@ final class PlayingAppsModel {
             NotificationCenter.default.removeObserver(terminationObserver)
         }
         terminationObserver = nil
+        stopLevelPolling()
         monitor.stop()
         tapController.apply(TapPlan(perApp: [:], global: nil))
+    }
+
+    // MARK: Level meters
+
+    /// The panel became visible: meter-only taps are created for playing apps
+    /// without a volume tap and the meters start polling (DESIGN §14).
+    func panelDidAppear() {
+        guard !isPanelVisible else { return }
+        isPanelVisible = true
+        applyTaps()
+        startLevelPolling()
+    }
+
+    /// The panel was hidden: every meter-only tap is destroyed and polling
+    /// stops, so audio routing is exactly as it was before.
+    func panelDidDisappear() {
+        guard isPanelVisible else { return }
+        isPanelVisible = false
+        stopLevelPolling()
+        applyTaps()
+    }
+
+    /// The meter level of the app with `id`, `0...1`, or `nil` while the panel
+    /// is hidden. Muted apps read 0.
+    func level(for id: String) -> Float? {
+        guard isPanelVisible else { return nil }
+        return isMuted(id) ? 0 : (levels[id] ?? 0)
+    }
+
+    /// Reads the peaks from the tap controller and updates `levels`.
+    /// Called by the poll timer; internal so tests can drive it.
+    func pollLevels() {
+        guard isPanelVisible else { return }
+        levels = smoother.update(peaks: tapController.peaks(), elapsed: Self.levelPollInterval)
+    }
+
+    private func startLevelPolling() {
+        guard isRunning, isPanelVisible, levelTimer == nil else { return }
+        let timer = Timer(timeInterval: Self.levelPollInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.pollLevels()
+            }
+        }
+        // `.common` keeps the meters moving while a slider is being dragged.
+        RunLoop.main.add(timer, forMode: .common)
+        levelTimer = timer
+    }
+
+    private func stopLevelPolling() {
+        levelTimer?.invalidate()
+        levelTimer = nil
+        smoother.reset()
+        if !levels.isEmpty { levels = [:] }
     }
 
     /// Reads the monitor, reconciles the shown apps and updates the taps.
     func refresh() {
         let processes = monitor.processes()
         processObjectIDs = Self.processObjectIDsByApp(processes)
+        meterObjectIDs = Self.processObjectIDsByApp(processes.filter { !isOwn($0) })
 
         let playing = Self.group(processes.filter(\.isRunningOutput)) { path in
             Self.displayName(forAppBundlePath: path)
@@ -303,7 +376,31 @@ final class PlayingAppsModel {
                 processObjectIDs: processObjectIDs[app.id] ?? []
             )
         }
-        tapController.apply(TapPlanner.plan(apps: inputs, softwareMaster: softwareMaster))
+        let plan = TapPlanner.plan(apps: inputs, softwareMaster: softwareMaster)
+
+        // Meter-only taps never change what the global tap excludes: it
+        // excludes volume-tapped apps and Earshot only (DESIGN §14).
+        let meters = MeterPlanner.plan(
+            apps: apps.map { app in
+                TapPlanInput(
+                    id: app.id,
+                    volume: volume(for: app.id),
+                    muted: isMuted(app.id),
+                    processObjectIDs: meterObjectIDs[app.id] ?? []
+                )
+            },
+            playingIDs: Set(apps.filter(\.isPlaying).map(\.id)),
+            volumeTapIDs: Set(plan.perApp.keys),
+            panelVisible: isPanelVisible
+        )
+        tapController.apply(TapPlan(perApp: plan.perApp, global: plan.global, meters: meters))
+    }
+
+    /// Whether the process is Earshot itself or belongs to its bundle.
+    private func isOwn(_ process: AudioProcess) -> Bool {
+        if process.pid == ownPID { return true }
+        guard let ownBundleID, let bundleID = process.bundleID else { return false }
+        return bundleID == ownBundleID || bundleID.hasPrefix(ownBundleID + ".")
     }
 
     /// The user-visible name of an app bundle, without the `.app` extension.

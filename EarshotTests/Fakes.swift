@@ -10,10 +10,15 @@ final class FakeTapController: TapController {
     /// The per-app part of the last plan.
     var lastApplied: [String: TapSpec] { lastPlan.perApp }
 
+    /// What `peaks()` returns.
+    var peaksToReturn: [String: Float] = [:]
+
     func apply(_ plan: TapPlan) {
         lastPlan = plan
         applyCallCount += 1
     }
+
+    func peaks() -> [String: Float] { peaksToReturn }
 }
 
 /// In-memory `VolumeStore` with the same "1.0 forgets" rule as the real one.
@@ -142,4 +147,87 @@ final class FakeNowPlayingSource: NowPlayingSource {
     func emit(_ info: NowPlayingInfo?) {
         onChange?(info)
     }
+}
+
+/// Test double for `GlobalHotKeys` that records registrations and lets a test
+/// press a shortcut.
+@MainActor
+final class FakeGlobalHotKeys: GlobalHotKeys {
+    var registrationSucceeds = true
+    private(set) var registered: [HotKey] = []
+    private var handlers: [@MainActor () -> Void] = []
+
+    func register(_ hotKey: HotKey, handler: @escaping @MainActor () -> Void) -> Bool {
+        guard registrationSucceeds else { return false }
+        registered.append(hotKey)
+        handlers.append(handler)
+        return true
+    }
+
+    func unregisterAll() {
+        registered.removeAll()
+        handlers.removeAll()
+    }
+
+    /// Fires the handler of `hotKey`, as the system would on a key press.
+    func press(_ hotKey: HotKey) {
+        for (key, handler) in zip(registered, handlers) where key == hotKey {
+            handler()
+        }
+    }
+}
+
+/// Test double for `VolumeKeyInterceptor`: trust is a flag, and a test sends
+/// media keys through `send(_:fine:)`.
+@MainActor
+final class FakeVolumeKeyInterceptor: VolumeKeyInterceptor {
+    var isTrusted = true
+    private(set) var isRunning = false
+    private(set) var startCallCount = 0
+    private(set) var promptCount = 0
+    private(set) var openSettingsCount = 0
+    private var handler: (@MainActor (MediaKeyEvent, Bool) -> Bool)?
+
+    func promptForTrust() { promptCount += 1 }
+
+    func openAccessibilitySettings() { openSettingsCount += 1 }
+
+    func start(handler: @escaping @MainActor (MediaKeyEvent, Bool) -> Bool) -> Bool {
+        guard isTrusted else { return false }
+        startCallCount += 1
+        isRunning = true
+        self.handler = handler
+        return true
+    }
+
+    func stop() {
+        isRunning = false
+        handler = nil
+    }
+
+    /// Delivers a key to the handler; returns whether it was consumed, or
+    /// `false` when the tap is not running (the system handles the key).
+    func send(_ event: MediaKeyEvent, fine: Bool = false) -> Bool {
+        handler?(event, fine) ?? false
+    }
+}
+
+/// Test double for `LaunchAtLoginService` with a settable status.
+@MainActor
+final class FakeLaunchAtLogin: LaunchAtLoginService {
+    var status: LaunchAtLoginStatus = .disabled
+
+    /// What `register()` leaves the status at, to simulate `requiresApproval`.
+    var statusAfterRegister: LaunchAtLoginStatus = .enabled
+    var registerError: (any Error)?
+    private(set) var openSettingsCount = 0
+
+    func register() throws {
+        if let registerError { throw registerError }
+        status = statusAfterRegister
+    }
+
+    func unregister() throws { status = .disabled }
+
+    func openLoginItemsSettings() { openSettingsCount += 1 }
 }

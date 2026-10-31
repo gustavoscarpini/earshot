@@ -30,13 +30,13 @@ Earshot is an open-source macOS menu bar app for per-app volume control, output 
 - Panel layout (340 pt wide, material background, sections separated by thin dividers), top to bottom:
   1. Header: the now playing track with artwork, progress and transport buttons, or an empty state when nothing plays (see §13)
   2. Output — device cards, then mute button and master volume slider
-  3. Playing now — apps currently playing: icon, name, slider, mute (room for a per-app level meter)
+  3. Playing now — apps currently playing: icon, name, slider, mute and, while the panel is open, a level meter (§14)
   4. Microphone — input device cards, mute button and input slider, level meter (see §2)
-  5. Footer: "Sound Settings…" shortcut and Quit
+  5. Footer: "Sound Settings…" shortcut, the settings gear menu (§15–§17) and Quit
   - Device cards show a connection-type subtitle (Built-in, USB, Bluetooth, ...) and an SF Symbol derived from the transport type and name. Battery level is not shown: there is no public API for it.
-- Menu bar icon: a template image derived from the audio state, most important first — muted microphone (`mic.slash.fill`), muted output (`speaker.slash.fill`), a still four-bar equalizer while any app plays (deliberately not animated, to keep the menu bar calm), the output device's symbol when idle on an external output, otherwise a speaker whose waves follow the volume. No mic-in-use badge: macOS already shows its orange indicator.
+- Menu bar icon: a template image made of the output glyph plus an optional microphone badge. The glyph is derived from the audio state, most important first — muted output (`speaker.slash.fill`), a still four-bar equalizer while any app plays (deliberately not animated, to keep the menu bar calm), the output device's symbol when idle on an external output, otherwise a speaker whose waves follow the volume. While the microphone is muted, a small `mic.slash.fill` badge is drawn to the right of the glyph (3 pt gap, 11 pt symbol, 16 pt tall image) instead of replacing it, so the output state stays visible; the pure resolution is `MenuBarIcon` in `Core/`, the compositing is `MenuBarIconRenderer`, and the image is redrawn only when the icon value changes. No mic-in-use badge: macOS already shows its orange indicator.
 - An app that stops playing stays in the list for **10 seconds**, dimmed, before disappearing (so sliders don't vanish under the cursor on pause).
-- A small Settings screen for options (keyboard, launch at login, shortcuts) is planned; the panel has no gear icon until it exists.
+- Options live in a gear `Menu` in the footer (launch at login, volume keys, a "Mute Microphone" item that shows ⌃⌘M), backed by `SettingsModel`; there is no separate Settings window.
 
 ### 5. Persistence and app grouping
 - Per-app volume is remembered by **bundle ID** and reapplied when the app plays again, across restarts. Apps never adjusted start at 100%.
@@ -46,7 +46,8 @@ Earshot is an open-source macOS menu bar app for per-app volume control, output 
 ### 6. Keyboard
 - Hardware volume keys (F11/F12) control Earshot's software master **only when the current output has no hardware volume**; otherwise events pass through to the system.
   - Requires a `CGEventTap` and therefore the **Accessibility** permission, requested only when the user enables this option in Settings.
-- Configurable global shortcut to toggle mic mute (no Accessibility needed — registered hotkey). The menu bar icon reflects mic-muted state.
+- Global shortcut to toggle mic mute: see §15. The menu bar icon reflects mic-muted state (§4).
+- Volume keys: see §16.
 
 ### 7. Distribution
 - Open source on GitHub; anyone can build from source with their own team.
@@ -65,7 +66,7 @@ Earshot is an open-source macOS menu bar app for per-app volume control, output 
 
 ### 9. Tap policy: on demand
 - An app is tapped **only** when its volume ≠ 100% or it is muted. Back to 100% and unmuted → tap destroyed, app plays directly to hardware again (zero added latency, zero dependency on Earshot).
-- Per-app level meters only appear for tapped apps.
+- Per-app level meters are described in §14: tapped apps are measured by their own tap, other playing apps get a read-only meter tap while the panel is open.
 - Software master below 100% (output without hardware volume): a **single global tap** ("all processes except X") excluding Earshot itself and any individually tapped apps, so gain is never applied twice. Individually tapped apps get `appGain × masterGain`.
 
 ### 10. Minimum macOS: 14.4
@@ -102,6 +103,32 @@ Earshot is an open-source macOS menu bar app for per-app volume control, output 
 - **Private API risk:** a macOS update may break the adapter. Then the header simply shows its empty state (the stream yields nothing, or the process keeps failing and Earshot gives up after a few relaunches); volume control, output and microphone are unaffected.
 - The helper framework is built from the vendored sources with plain `clang` by `Scripts/build-mediaremote-adapter.sh`, an Xcode run-script phase — no CMake or other extra tools. The framework is embedded and signed with the app.
 - The pure parts (line splitting, stream parsing, command IDs) live in `Earshot/Core/` and are tested; the process handling sits behind the `NowPlayingSource` protocol.
+
+### 14. Per-app level meters
+- Each playing app in the mixer shows a small segmented meter under its slider. It exists **only while the panel is visible** (`PlayingAppsModel.panelDidAppear/panelDidDisappear`, called from `PanelView` like the input meter).
+- **Apps with a volume tap** (volume ≠ 100% or muted): the tap's IO proc already walks every output sample, so it also records the peak of what it writes. The level is therefore **post-gain** (it follows the slider and is 0 when muted, and includes the software master). No second tap is created.
+- **Apps at 100% without a tap**: while the panel is visible `MeterPlanner` asks for a **meter-only tap**: a private process tap with `muteBehavior = .unmuted`, a private aggregate device on the default output (same construction as a volume tap) and an IO proc that only measures the input and writes silence. The app keeps playing straight to the hardware, untouched, so the level is the app's own (pre-master). Earshot's own process object is never tapped (filtered in the model and again in the controller). Only apps that are playing get one; lingering (dimmed) apps do not.
+- **Lifecycle:** `TapPlan` carries `meters` next to `perApp` and `global`; `TapReconciler.meterChanges` diffs them. On panel close the plan has no meters, so every meter-only tap, aggregate device and IO proc is destroyed and routing is exactly as before. A volume change away from 100% destroys the meter tap **before** the volume tap is created, and the way back destroys the volume tap before the meter tap is created, so an app never has both. A default output change tears down and rebuilds meters with the other taps (§3).
+- **Interaction with the software-master global tap (§9):** the global tap excludes process objects of *volume-tapped* apps and Earshot, and nothing else. Meter-only taps do not change that list: a metered app at 100% is still captured by the global tap (muted at the source, played back with the master gain) exactly as without a meter. The meter tap adds no playback (its IO proc writes zeros), so nothing is played twice, and an unmuted tap does not alter which taps mute the process. Its aggregate device is not a process, so the global tap cannot capture it. The meter of such an app reads the audio before the master gain. Whether Core Audio hands the same audio to an unmuted tap and a muting tap on one process is expected but needs checking on hardware (manual-test).
+- **Real-time safety:** the IO procs never allocate, lock, log or touch Swift concurrency. `LevelProbe` keeps a decaying peak hold (~50 ms) in I/O-thread-only state and publishes it with one aligned 32-bit store of the `Float` bit pattern into a manually allocated cell; the main actor reads it with one aligned 32-bit load. One writer, atomic word access on arm64 and x86-64, and a stale read only delays the meter by a buffer, the same justification as the gain target. `os_unfair_lock` was rejected (priority inversion on the I/O thread) and `Synchronization.Atomic` needs macOS 15.
+- **Polling and smoothing:** a 25 Hz timer (run loop `.common` mode, so meters move while a slider is dragged) runs only while the panel is visible. Peaks go through `LevelScale` (dB mapping) and `LevelSmoother` (instant attack, linear fall-off), in `Core/` and tested. Helpers of one app are mixed into one tap, so a grouped app already has a single combined level.
+- No new permission: meter taps use the same System Audio Recording access.
+
+### 15. Global shortcut: mute the microphone
+- **⌃⌘M** toggles the microphone mute from anywhere. It is registered with Carbon `RegisterEventHotKey`, which needs no Accessibility permission, behind the `GlobalHotKeys` protocol (`Earshot/System/`). The C callback only extracts the hot key ID and hops to the main queue before touching state (`MainActor.assumeIsolated`).
+- The action is `InputModel.toggleMute()`. When the input cannot be muted (`canMute == false`, or no device) the app plays `NSSound.beep()`.
+- The shortcut is fixed (not configurable) and always on. If another app already owns the combination, registration fails silently. It is shown in the mute button's tooltip and in the settings menu. The app registers it at launch except inside the unit-test host.
+
+### 16. Volume keys for outputs without hardware volume
+- Opt-in setting "Use volume keys for outputs without hardware volume" (`UserDefaults`, default off).
+- When on, a `CGEventTap` (session, head insert, default tap) listens for `systemDefined` events of subtype 8 and handles `NX_KEYTYPE_SOUND_UP` (0), `SOUND_DOWN` (1) and `MUTE` (7). Decoding and key→action mapping are pure (`MediaKeyEvent`, `VolumeKeyMapper` in `Core/`): steps of 1/16, 1/64 with Option+Shift, clamped and snapped to 1/64; mute toggles `OutputModel.toggleMute()`; stepping while muted unmutes, like macOS.
+- Events are consumed only while `OutputModel.usesSoftwareMaster` is true (key-up included, so the system never sees half a press); otherwise they pass through untouched. The tap is re-enabled on `tapDisabledByTimeout` / `tapDisabledByUserInput`. The tap runs on the main run loop, so its callback calls the handler synchronously on the main thread.
+- Requires **Accessibility** (`AXIsProcessTrusted`). Enabling the setting without trust shows the system prompt (`AXIsProcessTrustedWithOptions`); the menu then offers "Allow in Accessibility settings…". The tap starts once trusted: trust is re-checked whenever the panel opens (no polling), so granting the permission and opening the panel is enough.
+- Needs live testing with a real HDMI output; the tap itself cannot be unit-tested (`VolumeKeyInterceptor` has a fake).
+
+### 17. Launch at login
+- `SMAppService.mainApp` behind `LaunchAtLoginService`. The toggle always reflects the real `status` (re-read when the panel opens), never a stored flag. `requiresApproval` shows as on plus an "Allow in Login Items settings…" item that calls `SMAppService.openSystemSettingsLoginItems()`.
+- No `Info.plist` or build setting changes are needed for any of §15–§17: Carbon hot keys, `SMAppService.mainApp` and the Accessibility prompt (system text) have no usage-description keys, and the app is not sandboxed.
 
 ## Deferred to v2
 - Per-app output routing (different apps to different devices)

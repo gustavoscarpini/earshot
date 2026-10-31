@@ -21,9 +21,11 @@ struct ReadmeScreenshot {
                          executablePath: "/System/Applications/FaceTime.app/Contents/MacOS/FaceTime",
                          isRunningOutput: false, isRunningInput: true)
         ]
+        let taps = FakeTapController()
+        taps.peaksToReturn = ["/Applications/Spotify.app": 0.5]
         let playingApps = PlayingAppsModel(
             monitor: monitor,
-            tapController: FakeTapController(),
+            tapController: taps,
             volumeStore: InMemoryVolumeStore()
         )
         playingApps.start()
@@ -71,7 +73,15 @@ struct ReadmeScreenshot {
             playbackRate: 0
         ))
 
-        let panel = PanelView(nowPlaying: nowPlaying, playingApps: playingApps, output: output, input: input)
+        let settings = SettingsModel(
+            launchService: FakeLaunchAtLogin(),
+            volumeKeys: FakeVolumeKeyInterceptor(),
+            hotKeys: FakeGlobalHotKeys(),
+            input: input,
+            output: output,
+            defaults: UserDefaults(suiteName: "EarshotScreenshot")!
+        )
+        let panel = PanelView(nowPlaying: nowPlaying, playingApps: playingApps, output: output, input: input, settings: settings)
         let root = panel
             .background(Color(nsColor: NSColor(white: 0.14, alpha: 1)))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))

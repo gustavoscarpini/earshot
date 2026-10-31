@@ -32,9 +32,27 @@ struct MenuBarGlyphTests {
         #expect(MenuBarGlyph.resolve(.init(isOutputMuted: true, isPlaying: true)) == .outputMuted)
     }
 
-    @Test func mutedMicrophoneWinsOverEverything() {
+    @Test func mutedMicrophoneDoesNotChangeTheGlyph() {
         let inputs = MenuBarGlyph.Inputs(isMicMuted: true, isOutputMuted: true, isPlaying: true, outputDevice: airPods)
-        #expect(MenuBarGlyph.resolve(inputs) == .micMuted)
+        #expect(MenuBarGlyph.resolve(inputs) == .outputMuted)
+        #expect(MenuBarGlyph.resolve(.init(isMicMuted: true, isPlaying: true)) == .playing)
+        #expect(MenuBarGlyph.resolve(.init(isMicMuted: true, outputVolume: 0.4, outputDevice: speakers)) == .speaker(volume: 0.4))
+        #expect(MenuBarGlyph.resolve(.init(isMicMuted: true, outputDevice: airPods)) == .device(symbol: "airpodspro"))
+    }
+
+    @Test func iconHasNoBadgeWhileTheMicrophoneIsLive() {
+        let icon = MenuBarIcon.resolve(.init(outputVolume: 0.4, outputDevice: speakers))
+        #expect(icon == MenuBarIcon(glyph: .speaker(volume: 0.4), isMicMuted: false))
+    }
+
+    @Test func iconShowsTheBadgeNextToTheOutputGlyph() {
+        let inputs = MenuBarGlyph.Inputs(isMicMuted: true, isPlaying: true, outputDevice: airPods)
+        #expect(MenuBarIcon.resolve(inputs) == MenuBarIcon(glyph: .playing, isMicMuted: true))
+    }
+
+    @Test func iconBadgeKeepsTheMutedOutputGlyph() {
+        let inputs = MenuBarGlyph.Inputs(isMicMuted: true, isOutputMuted: true)
+        #expect(MenuBarIcon.resolve(inputs) == MenuBarIcon(glyph: .outputMuted, isMicMuted: true))
     }
 
     @Test func equalizerBarsAreFourAndInRange() {

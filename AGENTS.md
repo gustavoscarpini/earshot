@@ -47,13 +47,14 @@ skipped" warning and `com.apple.linkd.autoShortcut` log lines.
 | --- | --- |
 | `Earshot/Core/` | Pure logic, **Foundation only** (no CoreAudio, AppKit or SwiftUI): grouping, tracking, gain, tap policy/planning/reconciling, volume store, device and now-playing value types, stream parsing. Fully unit-tested. |
 | `Earshot/CoreAudio/` | Core Audio and AVFoundation behind `@MainActor` protocols: process monitor, tap controller, device controller (input/output), input level meter. |
+| `Earshot/System/` | Other system integrations behind `@MainActor` protocols: Carbon global hot keys, the volume-key `CGEventTap` (+ Accessibility trust), launch at login (`SMAppService`). |
 | `Earshot/NowPlaying/` | The `mediaremote-adapter` process wrapper behind `NowPlayingSource`, artwork color. |
-| `Earshot/App/` | `@Observable @MainActor` models (`PlayingAppsModel`, `OutputModel`, `InputModel`, `NowPlayingModel`, `MenuBarIconModel`) and `EarshotApp`. |
+| `Earshot/App/` | `@Observable @MainActor` models (`PlayingAppsModel`, `OutputModel`, `InputModel`, `NowPlayingModel`, `SettingsModel`, `MenuBarIconModel`) and `EarshotApp`. |
 | `Earshot/UI/` | SwiftUI views; `PanelView` is the menu bar panel. |
 | `Earshot/Resources/` | `Localizable.xcstrings`, assets. |
 | `EarshotTests/` | Swift Testing suites; fakes in `Fakes.swift` and `FakeAudioProcessMonitor.swift`. |
 | `Config/` | `Signing.xcconfig`, `Local.xcconfig.example`, `Info.plist`, entitlements. |
-| `Scripts/` | `build-mediaremote-adapter.sh` (Xcode run-script phase), `package-release.sh`. |
+| `Scripts/` | `build-mediaremote-adapter.sh` (Xcode run-script phase), `package-release.sh`, `make-app-icon.swift` (regenerates the `AppIcon` PNGs and `Contents.json`: `swift Scripts/make-app-icon.swift`). |
 | `Vendor/mediaremote-adapter/` | Vendored upstream sources (BSD-3). **Never edit**; see `VENDORED.md` to update. |
 | `docs/` | `DESIGN.md`, `manual-test.md`, `images/`. |
 

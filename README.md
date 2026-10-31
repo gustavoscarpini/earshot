@@ -35,21 +35,23 @@ Taps — no virtual audio driver, no kernel extension.
 - Volumes are remembered per app between launches.
 - Taps are created only for apps you actually change, so apps at 100% are left
   untouched.
+- A live level meter under each playing app's slider, only while the panel is
+  open. Apps at 100% are measured with a read-only tap that never changes what
+  you hear and disappears when the panel closes.
 
 ### 🎙️ Microphone
-- Pick the input device, set its input volume and mute it. The menu bar icon
-  shows when the mic is muted.
+- Pick the input device, set its input volume and mute it, from the panel or
+  anywhere with **⌃⌘M**. A small crossed-out mic next to the menu bar icon shows
+  when the mic is muted.
 - See which app is using the microphone ("In use by FaceTime"), with a live
   level meter that turns on by itself while another app is capturing.
 
 ### And also
 - English and Brazilian Portuguese.
+- Volume keys (F11/F12 and mute) that drive the software master on outputs
+  without hardware volume, such as HDMI monitors. Opt-in, in the gear menu.
+- Launch at login, from the gear menu.
 - A shortcut to the system Sound settings, and ⌘Q to quit.
-
-### Coming next
-- Per-app level meters.
-- Volume keys (F11/F12) for the software master and a global mic-mute shortcut.
-- Launch at login and a proper app icon.
 
 ## Made with vibe coding
 
@@ -172,6 +174,9 @@ TEAM_ID=ABCDE12345 VERSION=0.1.0 NOTARY_PROFILE=earshot make dist
   (`NSAudioCaptureUsageDescription`).
 - **Microphone** — only while the input level meter runs. Earshot never records
   or stores audio (`NSMicrophoneUsageDescription`).
+- **Accessibility** — optional. Only needed if you turn on "Use volume keys for
+  outputs without hardware volume", so Earshot can see the volume keys. Earshot
+  asks when you enable the option; nothing else uses it.
 
 Earshot is not sandboxed (`ENABLE_APP_SANDBOX = NO`) and runs with the hardened
 runtime.

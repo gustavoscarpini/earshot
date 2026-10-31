@@ -23,6 +23,15 @@ struct TapPlan: Equatable, Sendable {
 
     /// The global tap for the software master, or `nil` when none is needed.
     let global: GlobalTapSpec?
+
+    /// The meter-only taps (DESIGN §14), keyed by app id.
+    let meters: [String: MeterSpec]
+
+    init(perApp: [String: TapSpec], global: GlobalTapSpec?, meters: [String: MeterSpec] = [:]) {
+        self.perApp = perApp
+        self.global = global
+        self.meters = meters
+    }
 }
 
 /// Decides every tap in one place (DESIGN §9).

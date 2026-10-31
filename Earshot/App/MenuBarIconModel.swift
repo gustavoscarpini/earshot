@@ -4,16 +4,17 @@ import Observation
 /// The menu bar icon: follows the output, input and playing apps models and
 /// publishes the image to show (DESIGN §4).
 ///
-/// It re-resolves the glyph whenever an observed property changes and only
-/// redraws when the glyph actually changes.
+/// It re-resolves the icon (output glyph plus the muted microphone badge)
+/// whenever an observed property changes and only redraws when the icon
+/// actually changes.
 @MainActor
 @Observable
 final class MenuBarIconModel {
     /// The image for the `MenuBarExtra` label.
     private(set) var image: NSImage
 
-    /// The glyph currently shown.
-    private(set) var glyph: MenuBarGlyph
+    /// The icon currently shown.
+    private(set) var icon: MenuBarIcon
 
     @ObservationIgnored private let output: OutputModel
     @ObservationIgnored private let input: InputModel
@@ -24,9 +25,9 @@ final class MenuBarIconModel {
         self.output = output
         self.input = input
         self.playingApps = playingApps
-        let glyph = MenuBarGlyph.resolve(.init())
-        self.glyph = glyph
-        self.image = MenuBarIconRenderer.image(for: glyph)
+        let icon = MenuBarIcon.resolve(.init())
+        self.icon = icon
+        self.image = MenuBarIconRenderer.image(for: icon)
     }
 
     /// Starts following the models. Call once, at launch.
@@ -36,16 +37,16 @@ final class MenuBarIconModel {
         track()
     }
 
-    /// Resolves the glyph and re-arms observation of the properties it read.
+    /// Resolves the icon and re-arms observation of the properties it read.
     private func track() {
-        let newGlyph = withObservationTracking {
-            MenuBarGlyph.resolve(currentInputs())
+        let newIcon = withObservationTracking {
+            MenuBarIcon.resolve(currentInputs())
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in self?.track() }
         }
-        guard newGlyph != glyph else { return }
-        glyph = newGlyph
-        image = MenuBarIconRenderer.image(for: newGlyph)
+        guard newIcon != icon else { return }
+        icon = newIcon
+        image = MenuBarIconRenderer.image(for: newIcon)
     }
 
     private func currentInputs() -> MenuBarGlyph.Inputs {

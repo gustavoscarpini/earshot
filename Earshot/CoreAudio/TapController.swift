@@ -22,4 +22,10 @@ protocol TapController: AnyObject {
     /// Failures are per tap: a tap that cannot be created is left out and
     /// retried on the next call.
     func apply(_ plan: TapPlan)
+
+    /// The current linear peak amplitude (`1` is full scale) of each app that
+    /// has a tap, keyed by app id: volume taps report their post-gain output,
+    /// meter-only taps (`TapPlan.meters`) the untouched audio (DESIGN §14).
+    /// Cheap and safe to call at 20-30 Hz.
+    func peaks() -> [String: Float]
 }

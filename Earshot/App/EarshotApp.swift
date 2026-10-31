@@ -29,6 +29,10 @@ struct EarshotApp: App {
     /// models (DESIGN §4).
     @State private var menuBarIcon: MenuBarIconModel
 
+    /// The settings menu model: the mic-mute shortcut, the volume keys and
+    /// launch at login (DESIGN §15–§17).
+    @State private var settings: SettingsModel
+
     init() {
         let model = PlayingAppsModel(
             monitor: CoreAudioProcessMonitor(),
@@ -52,16 +56,26 @@ struct EarshotApp: App {
         outputModel.start()
         inputModel.start()
         iconModel.start()
+        let settingsModel = SettingsModel(
+            launchService: SMAppLaunchAtLogin(),
+            volumeKeys: CGEventTapVolumeKeys(),
+            hotKeys: CarbonGlobalHotKeys(),
+            input: inputModel,
+            output: outputModel
+        )
+        _settings = State(initialValue: settingsModel)
         // The unit tests run inside the app as their host, which is killed
         // without a graceful quit; it must not spawn the adapter's perl process.
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
             nowPlayingModel.start()
+            // Same reason: no real hot key or event tap inside the test host.
+            settingsModel.start()
         }
     }
 
     var body: some Scene {
         MenuBarExtra {
-            PanelView(nowPlaying: nowPlaying, playingApps: playingApps, output: output, input: input)
+            PanelView(nowPlaying: nowPlaying, playingApps: playingApps, output: output, input: input, settings: settings)
         } label: {
             Label {
                 Text("Earshot")

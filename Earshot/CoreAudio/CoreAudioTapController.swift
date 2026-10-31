@@ -24,6 +24,9 @@ final class CoreAudioTapController: TapController {
     /// The taps that exist right now, with the spec each was built from.
     private var active: [String: (spec: TapSpec, tap: ProcessTap)] = [:]
 
+    /// The meter-only taps that exist right now (DESIGN §14).
+    private var activeMeters: [String: (spec: MeterSpec, tap: ProcessTap)] = [:]
+
     /// The global tap, if one exists, with the spec it was built from.
     private var activeGlobal: (spec: GlobalTapSpec, tap: ProcessTap)?
 
@@ -56,7 +59,20 @@ final class CoreAudioTapController: TapController {
     func apply(_ plan: TapPlan) {
         desired = plan
 
-        // Per-app changes first, then the global one.
+        // Meter-only taps that go away (or change) are destroyed before the
+        // per-app taps are touched, and new ones are built only after, so an
+        // app never has a meter tap and a volume tap at once (DESIGN §14).
+        let meterChanges = TapReconciler.meterChanges(current: activeMeters.mapValues(\.spec), desired: plan.meters)
+        for change in meterChanges {
+            switch change {
+            case .destroy(let id), .recreate(let id, _):
+                activeMeters.removeValue(forKey: id)?.tap.destroy()
+            case .create:
+                break
+            }
+        }
+
+        // Per-app changes, then the meters, then the global tap.
         let current = active.mapValues(\.spec)
         for change in TapReconciler.changes(current: current, desired: plan.perApp) {
             switch change {
@@ -74,7 +90,27 @@ final class CoreAudioTapController: TapController {
             }
         }
 
+        for change in meterChanges {
+            switch change {
+            case .create(let id, let spec), .recreate(let id, let spec):
+                buildMeter(id: id, spec: spec)
+            case .destroy:
+                break
+            }
+        }
+
         applyGlobal(plan.global)
+    }
+
+    func peaks() -> [String: Float] {
+        var result: [String: Float] = [:]
+        for (id, entry) in activeMeters {
+            result[id] = entry.tap.peak
+        }
+        for (id, entry) in active {
+            result[id] = entry.tap.peak
+        }
+        return result
     }
 
     // MARK: Private
@@ -86,10 +122,27 @@ final class CoreAudioTapController: TapController {
         }
         do {
             let description = CATapDescription(stereoMixdownOfProcesses: spec.processObjectIDs.map { AudioObjectID($0) })
-            let tap = try ProcessTap(description: description, outputDeviceUID: outputUID, gain: spec.gain)
+            let tap = try ProcessTap(description: description, outputDeviceUID: outputUID, mode: .playback(gain: spec.gain))
             active[id] = (spec, tap)
         } catch {
             Self.logger.error("Could not tap \(id, privacy: .public): \(error, privacy: .public)")
+        }
+    }
+
+    /// Builds a meter-only tap. Earshot's own process object is never tapped
+    /// (it would meter Earshot's own playback), and an app left with no process
+    /// object gets no meter.
+    private func buildMeter(id: String, spec: MeterSpec) {
+        guard let outputUID else { return }
+        let own = Self.ownProcessObjectID()
+        let objects = spec.processObjectIDs.filter { $0 != own }
+        guard !objects.isEmpty else { return }
+        do {
+            let description = CATapDescription(stereoMixdownOfProcesses: objects.map { AudioObjectID($0) })
+            let tap = try ProcessTap(description: description, outputDeviceUID: outputUID, mode: .meterOnly)
+            activeMeters[id] = (spec, tap)
+        } catch {
+            Self.logger.info("Could not meter \(id, privacy: .public): \(error, privacy: .public)")
         }
     }
 
@@ -139,7 +192,7 @@ final class CoreAudioTapController: TapController {
             let description = CATapDescription(
                 stereoGlobalTapButExcludeProcesses: spec.excludedProcessObjectIDs.map { AudioObjectID($0) }
             )
-            let tap = try ProcessTap(description: description, outputDeviceUID: outputUID, gain: spec.gain)
+            let tap = try ProcessTap(description: description, outputDeviceUID: outputUID, mode: .playback(gain: spec.gain))
             activeGlobal = (spec, tap)
         } catch {
             Self.logger.error("Could not build the global tap: \(error, privacy: .public)")
@@ -155,6 +208,10 @@ final class CoreAudioTapController: TapController {
             entry.tap.destroy()
         }
         active.removeAll()
+        for entry in activeMeters.values {
+            entry.tap.destroy()
+        }
+        activeMeters.removeAll()
         activeGlobal?.tap.destroy()
         activeGlobal = nil
         apply(desired)
@@ -216,7 +273,11 @@ struct CoreAudioError: Error, CustomStringConvertible {
     var description: String { "\(operation) failed (OSStatus \(status))" }
 }
 
-/// One tap: process tap → private aggregate device → IOProc with gain.
+/// One tap: process tap → private aggregate device → IOProc.
+///
+/// In `.playback` mode the IOProc applies the gain and plays to the output; in
+/// `.meterOnly` mode (DESIGN §14) the tap is unmuted and the IOProc only
+/// measures and writes silence.
 ///
 /// The process tap (per-app, or global with exclusions) delivers stereo and
 /// mutes the captured processes' own output while it is being read. The
@@ -227,19 +288,38 @@ private final class ProcessTap {
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var ioProcID: AudioDeviceIOProcID?
-    private let renderer: TapRenderer
+    private let probe = LevelProbe()
+    private let renderer: TapRenderer?
+
+    /// What the tap's IOProc does.
+    enum Mode {
+        /// Mute the app's own output and play it back with this gain.
+        case playback(gain: Float)
+        /// Leave the app's output alone and only measure it.
+        case meterOnly
+    }
+
+    /// The latest peak of the audio the IOProc handled (post-gain in playback
+    /// mode). Readable from the main actor.
+    var peak: Float { probe.value }
 
     /// - Parameters:
     ///   - description: A ready tap description; name, privacy and mute
     ///     behavior are set here.
     ///   - outputDeviceUID: The output device the aggregate plays to.
-    ///   - gain: The initial linear gain.
-    init(description: CATapDescription, outputDeviceUID: String, gain: Float) throws {
-        renderer = TapRenderer(gain: gain)
+    ///   - mode: Playback with a gain, or meter only.
+    init(description: CATapDescription, outputDeviceUID: String, mode: Mode) throws {
+        switch mode {
+        case .playback(let gain):
+            renderer = TapRenderer(gain: gain, probe: probe)
+            description.muteBehavior = .mutedWhenTapped
+        case .meterOnly:
+            renderer = nil
+            description.muteBehavior = .unmuted
+        }
 
         description.name = "Earshot"
         description.isPrivate = true
-        description.muteBehavior = .mutedWhenTapped
 
         do {
             try Self.check("AudioHardwareCreateProcessTap", AudioHardwareCreateProcessTap(description, &tapID))
@@ -266,13 +346,22 @@ private final class ProcessTap {
                 AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &aggregateID)
             )
 
-            let renderer = self.renderer
-            try Self.check(
-                "AudioDeviceCreateIOProcIDWithBlock",
-                AudioDeviceCreateIOProcIDWithBlock(&ioProcID, aggregateID, nil) { _, input, _, output, _ in
-                    renderer.render(input: input, output: output)
-                }
-            )
+            if let renderer {
+                try Self.check(
+                    "AudioDeviceCreateIOProcIDWithBlock",
+                    AudioDeviceCreateIOProcIDWithBlock(&ioProcID, aggregateID, nil) { _, input, _, output, _ in
+                        renderer.render(input: input, output: output)
+                    }
+                )
+            } else {
+                let probe = self.probe
+                try Self.check(
+                    "AudioDeviceCreateIOProcIDWithBlock",
+                    AudioDeviceCreateIOProcIDWithBlock(&ioProcID, aggregateID, nil) { _, input, _, output, _ in
+                        MeterRenderer.measure(input: input, output: output, probe: probe)
+                    }
+                )
+            }
             try Self.check("AudioDeviceStart", AudioDeviceStart(aggregateID, ioProcID))
         } catch {
             destroy()
@@ -281,7 +370,7 @@ private final class ProcessTap {
     }
 
     func setGain(_ gain: Float) {
-        renderer.targetGain = gain
+        renderer?.targetGain = gain
     }
 
     /// Stops playback and releases every Core Audio object, in reverse order of
@@ -320,11 +409,13 @@ private final class ProcessTap {
 /// linearly across a buffer to avoid zipper noise.
 private final class TapRenderer: @unchecked Sendable {
     private let target: UnsafeMutablePointer<Float32>
+    private let probe: LevelProbe
 
     /// The gain at the end of the previous buffer. I/O thread only.
     private var current: Float32
 
-    init(gain: Float) {
+    init(gain: Float, probe: LevelProbe) {
+        self.probe = probe
         target = .allocate(capacity: 1)
         target.initialize(to: gain)
         current = gain
@@ -381,6 +472,7 @@ private final class TapRenderer: @unchecked Sendable {
         // Write left/right to the first two output channels across buffers
         // (downmixed when the output is mono); silence everything else.
         var channelOffset = 0
+        var peak: Float32 = 0
         for buffer in outputs {
             guard let data = buffer.mData else { continue }
             memset(data, 0, Int(buffer.mDataByteSize))
@@ -405,11 +497,82 @@ private final class TapRenderer: @unchecked Sendable {
                     } else {
                         sample = isLeft ? l : r
                     }
-                    samples[frame * channels + channel] = sample * gain
+                    let scaled = sample * gain
+                    samples[frame * channels + channel] = scaled
+                    peak = max(peak, abs(scaled))
                 }
             }
         }
 
         current = end
+        probe.publish(peak: peak, frames: frames)
+    }
+}
+
+/// A peak value shared between the HAL I/O thread (one writer) and the main
+/// actor (readers), without locks.
+///
+/// The I/O thread keeps a decaying peak hold (`held`, I/O thread only), so a
+/// 25 Hz poll does not miss the peaks of the ~100 buffers per second it skips,
+/// and publishes it as the bit pattern of a `Float` with one aligned 32-bit
+/// store. The main actor does one aligned 32-bit load. That is atomic on arm64
+/// and x86-64, there is exactly one writer, and a stale read only delays the
+/// meter by one buffer, the same justification as `TapRenderer.target`. A lock
+/// (`os_unfair_lock`) would risk priority inversion on the I/O thread, and
+/// `Synchronization.Atomic` needs macOS 15.
+final class LevelProbe: @unchecked Sendable {
+    /// Frames over which the hold falls by a factor of e (~50 ms at 48 kHz).
+    private static let releaseFrames: Float = 2_400
+
+    private let storage: UnsafeMutablePointer<UInt32>
+    private var held: Float32 = 0
+
+    init() {
+        storage = .allocate(capacity: 1)
+        storage.initialize(to: 0)
+    }
+
+    deinit {
+        storage.deallocate()
+    }
+
+    /// The last published peak, `0...`. Any thread.
+    var value: Float { Float(bitPattern: storage.pointee) }
+
+    /// Folds in the peak of one buffer. I/O thread only; does not allocate or lock.
+    func publish(peak: Float32, frames: Int) {
+        let decay = expf(-Float(frames) / Self.releaseFrames)
+        var next = max(peak, held * decay)
+        if next < 1e-6 { next = 0 }
+        held = next
+        storage.pointee = next.bitPattern
+    }
+}
+
+/// The real-time part of a meter-only tap: measures the input, writes silence.
+///
+/// Runs on the HAL I/O thread, so it never allocates, locks or logs.
+private enum MeterRenderer {
+    static func measure(
+        input: UnsafePointer<AudioBufferList>,
+        output: UnsafeMutablePointer<AudioBufferList>,
+        probe: LevelProbe
+    ) {
+        for buffer in UnsafeMutableAudioBufferListPointer(output) {
+            if let data = buffer.mData { memset(data, 0, Int(buffer.mDataByteSize)) }
+        }
+
+        var peak: Float32 = 0
+        var frames = 0
+        for buffer in UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: input)) {
+            guard let data = buffer.mData, buffer.mNumberChannels > 0 else { continue }
+            let count = Int(buffer.mDataByteSize) / MemoryLayout<Float32>.size
+            let samples = data.assumingMemoryBound(to: Float32.self)
+            for index in 0..<count {
+                peak = max(peak, abs(samples[index]))
+            }
+            if frames == 0 { frames = count / Int(buffer.mNumberChannels) }
+        }
+        probe.publish(peak: peak, frames: frames)
     }
 }

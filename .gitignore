@@ -18,3 +18,6 @@ Config/Local.xcconfig
 *.cer
 *.mobileprovision
 *.provisionprofile
+
+# Agent worktrees
+.claude/worktrees/

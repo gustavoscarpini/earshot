@@ -5,13 +5,14 @@ import SwiftUI
 ///
 /// From top to bottom: the now playing header (or its empty state), then the
 /// Output, Apps and Microphone sections separated by thin dividers, and a footer
-/// with the Sound Settings shortcut and Quit. The Apps section lists the apps
+/// with the Sound Settings shortcut, the settings menu and Quit. The Apps section lists the apps
 /// playing audio, with their icon, name, volume slider and mute button.
 struct PanelView: View {
     let nowPlaying: NowPlayingModel
     let playingApps: PlayingAppsModel
     let output: OutputModel
     let input: InputModel
+    let settings: SettingsModel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,6 +60,8 @@ struct PanelView: View {
 
                 Spacer()
 
+                SettingsMenu(model: settings)
+
                 Button("Quit") {
                     NSApplication.shared.terminate(nil)
                 }
@@ -75,9 +78,12 @@ struct PanelView: View {
         // panel is visible (DESIGN §2).
         .onAppear {
             input.panelDidAppear()
+            playingApps.panelDidAppear()
+            settings.panelDidAppear()
         }
         .onDisappear {
             input.panelDidDisappear()
+            playingApps.panelDidDisappear()
         }
         .onChange(of: playingApps.micUsers, initial: true) { _, users in
             input.setOtherAppsUsingMic(!users.isEmpty)
@@ -97,17 +103,27 @@ struct PanelView: View {
             Text("No apps are playing audio.")
                 .foregroundStyle(.secondary)
         } else {
-            VStack(spacing: 10) {
-                ForEach(playingApps.apps) { app in
-                    AppMixerRow(app: app, model: playingApps, level: nil)
-                }
-            }
+            AppsList(model: playingApps)
         }
     }
 
     private func openSoundSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.Sound-Settings.extension") {
             NSWorkspace.shared.open(url)
+        }
+    }
+}
+
+/// The rows of the Apps section. A separate view so the ~25 Hz meter updates
+/// re-render only the rows, not the whole panel.
+private struct AppsList: View {
+    let model: PlayingAppsModel
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ForEach(model.apps) { app in
+                AppMixerRow(app: app, model: model, level: model.level(for: app.id))
+            }
         }
     }
 }
@@ -184,7 +200,9 @@ private struct InputSection: View {
                 isSliderDisabled: model.isMuted || !model.hasHardwareVolume,
                 isMinIconEnabled: model.canMute,
                 onMinIconTap: { model.toggleMute() },
-                minIconHelp: model.canMute ? (model.isMuted ? "Unmute" : "Mute") : "Not supported by this device"
+                minIconHelp: model.canMute
+                    ? (model.isMuted ? "Unmute (\(HotKey.toggleMicrophoneMute.display))" : "Mute (\(HotKey.toggleMicrophoneMute.display))")
+                    : "Not supported by this device"
             )
             .padding(.top, 4)
 
@@ -299,5 +317,53 @@ private struct PanelSection<Content: View>: View {
         .overlay(alignment: .top) {
             Divider().opacity(0.5)
         }
+    }
+}
+
+/// The gear menu in the footer: launch at login, volume keys and the
+/// microphone shortcut (DESIGN §15–§17).
+private struct SettingsMenu: View {
+    let model: SettingsModel
+
+    var body: some View {
+        Menu {
+            Toggle("Launch at Login", isOn: Binding(
+                get: { model.launchAtLogin != .disabled },
+                set: { model.setLaunchAtLogin($0) }
+            ))
+            if model.launchAtLogin == .requiresApproval {
+                Button("Allow in Login Items settings…") {
+                    model.openLoginItemsSettings()
+                }
+            }
+
+            Toggle("Use volume keys for outputs without hardware volume", isOn: Binding(
+                get: { model.volumeKeysEnabled },
+                set: { model.setVolumeKeysEnabled($0) }
+            ))
+            if model.volumeKeysEnabled, !model.isAccessibilityTrusted {
+                Button("Allow in Accessibility settings…") {
+                    model.openAccessibilitySettings()
+                }
+            }
+
+            Divider()
+
+            // The global hot key catches ⌃⌘M first; the shortcut here only
+            // shows it next to the item, the way menus do.
+            Button(model.isMicrophoneMuted ? "Unmute Microphone" : "Mute Microphone") {
+                model.toggleMicrophoneMute()
+            }
+            .keyboardShortcut("m", modifiers: [.control, .command])
+            .disabled(!model.canMuteMicrophone)
+        } label: {
+            Image(systemName: "gearshape")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .foregroundStyle(.secondary)
+        .help("Settings")
+        .accessibilityLabel("Settings")
     }
 }
